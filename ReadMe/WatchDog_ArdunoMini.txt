@@ -1,0 +1,14 @@
+http://arduino.ru/forum/apparatnye-voprosy/watchdog-ili-kak-podruzhit-arduino-so-storozhevym-psom
+
+Для всех Arduino кроме Uno не работает перезагрузка по watch_dog
+
+Чтобы заработало: http://arduino.ru/forum/apparatnye-voprosy/watchdog-ili-kak-podruzhit-arduino-so-storozhevym-psom
+надо перепрошить загрузчик на Optiboot:
+https://elchupanibrei.livejournal.com/32211.html
+скачать и установить
+в настройках ArduinoUDE проставить ссылку на загрузчик
+прошить загрузчик, программатором. если при этом ошибка, заменить avrude.exe на 
+
+
+Фьюзы:
+http://www.martyncurrey.com/arduino-atmega-328p-fuse-settings/
