@@ -1749,7 +1749,7 @@ void RefreshSensorData()
 // V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEED1, V_TO_SPEED2, V_SPEED1, V_SPEED2, V_TO_OFF, V_OFF
 void VentControl()
 {
-  //  float kT = y = -3.75 * t_out + 525;
+  float kT =  (-4 * t_out + 525) / PPM_SWITCH_OFF_VENT;
 
   //  Serial.print("modeVent");
   //  Serial.println(modeVent[ROOM_BED]);
