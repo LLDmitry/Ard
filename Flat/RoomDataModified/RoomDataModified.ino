@@ -148,7 +148,7 @@ byte Mode = 0;
 byte values[NUMBER_STATISTICS];
 byte indexStatistic = 0;
 
-string alertedRooms = "";
+String alertedRooms = "";
 
 //typedef struct {
 //  enInCommand Command;  //1b
@@ -718,9 +718,9 @@ void HandleInputNrfCommand()
   {
     for (byte iCheckRoom = 0; iCheckRoom <= 5; iCheckRoom++)  //сформируем строку с номерами комнат с тревогой
     {
-      if (bitRead(nrfRequest.Rooms, iCheckRoom))
+      if (bitRead(nrfRequest.alarmRooms, iCheckRoom))
       {
-        alertedRooms = alertedRooms + (string)(iCheckRoom + 1);
+        alertedRooms = alertedRooms + (String)(iCheckRoom + 1);
       }
     }
     switch (nrfRequest.alarmMaxStatus)

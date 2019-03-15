@@ -1,7 +1,3 @@
-      #include <NrfCommands.h>
-
-//#include <NrfCommands.h> // C:\Program Files (x86)\Arduino\libraries\NrfCommands
-
 //Home_Central Control
 //Arduino Mini
 //Управление домом без GSM
@@ -15,6 +11,7 @@
 /// !!!  https://wiki.iarduino.ru/page/NRF24L01-trema/
 //
 
+#include <NrfCommands.h> // C:\Program Files (x86)\Arduino\libraries\NrfCommands
 #include <SoftwareSerial.h>
 #include <elapsedMillis.h>
 #include <OneWire.h>
