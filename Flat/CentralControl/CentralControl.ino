@@ -1,4 +1,4 @@
-  //Home_Central Control
+//Home_Central Control
 //Arduino Mega
 //Управление домом по GSM.
 //Получение сигнала ALARM, VODA1, VODA2 на тел-н
