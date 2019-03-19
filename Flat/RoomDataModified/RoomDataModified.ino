@@ -38,8 +38,8 @@
 #define CO2_TX        A0
 #define CO2_RX        A1
 
-#define SQA           A4  //(SDA) I2C
-#define SCL           A5  //(SCK) I2C
+//#define SQA           A4  //(SDA) I2C
+//#define SCL           A5  //(SCK) I2C
 
 //#define OLED_RESET  4
 
@@ -54,8 +54,8 @@
 #define TFT_DC        9                   // Указываем пины dc (A0)
 #define TFT_RST       8                   // Указываем пины reset
 
-#define BZZ_PIN       4
-#define IR_RECV_PIN   5
+#define BZZ_PIN       5
+#define IR_RECV_PIN   4
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
 
 
