@@ -33,7 +33,7 @@
 
 #define DHTTYPE DHT22
 
-#define DHT_PIN       2
+#define DHT_PIN       3
 
 #define CO2_TX        A0
 #define CO2_RX        A1
@@ -56,6 +56,8 @@
 
 #define BZZ_PIN       5
 #define IR_RECV_PIN   4
+#define LED_PIN       2
+#define LGHT_PIN      A3
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
 
 
