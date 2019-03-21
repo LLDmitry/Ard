@@ -92,7 +92,7 @@ const byte ROOM_NUMBER = 1; //1,2,3,4; 0 -main control (if exists)
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин
 const uint32_t CHANGE_STATISTIC_INTERVAL_S = 3;
-const uint32_t SET_LED_INTERVAL_S = 60;  //1 мин
+const uint32_t SET_LED_INTERVAL_S = 5;
 
 const byte NUMBER_STATISTICS = 60;
 
@@ -117,7 +117,7 @@ const int LEVEL1_CO2_ALARM = 600;
 const int LEVEL2_CO2_ALARM = 900;
 const int LEVEL3_CO2_ALARM = 1200;
 
-const byte LIGHT_LEVEL_DARK = 70;
+const int LIGHT_LEVEL_DARK = 370;
 
 const int EEPROM_ADR_INDEX_STATISTIC = 1023; //last address in eeprom for store indexStatistic
 
@@ -806,7 +806,7 @@ void SetLed()
 {
   if (setLed_ms > SET_LED_INTERVAL_S * 1000)
   {
-    byte lightLevel = analogRead(LGHT_SENSOR_PIN);
+    int lightLevel = analogRead(LGHT_SENSOR_PIN);
     digitalWrite(LED_PIN, (lightLevel > LIGHT_LEVEL_DARK));
     setLed_ms = 0;
   }
