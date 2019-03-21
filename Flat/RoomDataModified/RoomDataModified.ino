@@ -57,7 +57,8 @@
 #define BZZ_PIN       5
 #define IR_RECV_PIN   4
 #define LED_PIN       2
-#define LGHT_PIN      A3
+#define LGHT_SENSOR_PIN      A3
+
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
 
 
@@ -91,6 +92,7 @@ const byte ROOM_NUMBER = 1; //1,2,3,4; 0 -main control (if exists)
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин
 const uint32_t CHANGE_STATISTIC_INTERVAL_S = 3;
+const uint32_t SET_LED_INTERVAL_S = 60;  //1 мин
 
 const byte NUMBER_STATISTICS = 60;
 
@@ -115,6 +117,8 @@ const int LEVEL1_CO2_ALARM = 600;
 const int LEVEL2_CO2_ALARM = 900;
 const int LEVEL3_CO2_ALARM = 1200;
 
+const byte LIGHT_LEVEL_DARK = 70;
+
 const int EEPROM_ADR_INDEX_STATISTIC = 1023; //last address in eeprom for store indexStatistic
 
 // Single radio pipe address for the 2 nodes to communicate.  Значение "трубы" передатчика и приемника ОБЯЗАНЫ быть одинаковыми.
@@ -136,6 +140,7 @@ const byte H3 = 25;
 elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 elapsedMillis saveStatistic_ms = (SAVE_STATISTIC_INTERVAL_S - REFRESH_SENSOR_INTERVAL_S * 1000 * 2) * 1000;
 elapsedMillis changeStatistic_ms = 0;
+elapsedMillis setLed_ms = 0;
 
 IRrecv irrecv(IR_RECV_PIN);
 
@@ -238,6 +243,8 @@ void setup()
   irrecv.enableIRIn(); // Start the ir receiver
 
   pinMode(BZZ_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode( LGHT_SENSOR_PIN, INPUT);
 }
 
 //void AutoChangeShowMode()
@@ -795,6 +802,16 @@ void CheckIR()
   }
 }
 
+void SetLed()
+{
+  if (setLed_ms > SET_LED_INTERVAL_S * 1000)
+  {
+    byte lightLevel = analogRead(LGHT_SENSOR_PIN);
+    digitalWrite(LED_PIN, (lightLevel > LIGHT_LEVEL_DARK));
+    setLed_ms = 0;
+  }
+}
+
 void loop()
 {
   ReadCommandNRF(); //each loop try read t_out and other info from central control
@@ -802,4 +819,5 @@ void loop()
   RefreshSensorData();
   ChangeStatistic();
   CheckIR();
+  SetLed();
 }
