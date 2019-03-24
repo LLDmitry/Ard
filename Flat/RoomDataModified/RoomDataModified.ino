@@ -33,8 +33,6 @@
 
 #define DHTTYPE DHT22
 
-#define DHT_PIN       3
-
 #define CO2_TX        A0
 #define CO2_RX        A1
 
@@ -54,9 +52,10 @@
 #define TFT_DC        9                   // Указываем пины dc (A0)
 #define TFT_RST       8                   // Указываем пины reset
 
-#define BZZ_PIN       5
+#define BZZ_PIN       2
+#define LED_PIN       3
 #define IR_RECV_PIN   4
-#define LED_PIN       2
+#define DHT_PIN       5
 #define LGHT_SENSOR_PIN      A3
 
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
