@@ -56,6 +56,7 @@
 #define LED_PIN       3
 #define IR_RECV_PIN   4
 #define DHT_PIN       5
+#define BTTN_PIN      A2
 #define LGHT_SENSOR_PIN      A3
 
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
