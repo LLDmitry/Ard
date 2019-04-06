@@ -386,7 +386,7 @@ void RadioSetup()
   radio.begin();                          // Включение модуля;
   _delay_ms(2);
   radio.enableAckPayload();       //+
-  radio.setPayloadSize(18);
+  radio.setPayloadSize(32);
   radio.setChannel(ChannelNRF);             // Установка канала вещания;
   //radio.setRetries(10, 10);               // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);            // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.

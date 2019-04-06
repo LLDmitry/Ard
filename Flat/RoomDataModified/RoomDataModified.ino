@@ -6,7 +6,7 @@
 // GND   GND
 // VCC   +5В
 // RESET   8
-// A0  9
+// A0/RS  9
 // SDA   11
 // SCK   13
 // CS  10
@@ -44,9 +44,9 @@
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 #define RNF_CE_PIN    6
 #define RNF_CSN_PIN   7
-#define RNF_MOSI      11
+#define RNF_MOSI      11  //SDA
 #define RNF_MISO      12
-#define RNF_SCK       13
+#define RNF_SCK       13  
 
 #define TFT_CS        10                  // Указываем пины cs
 #define TFT_DC        9                   // Указываем пины dc (A0)
@@ -124,7 +124,6 @@ const int EEPROM_ADR_INDEX_STATISTIC = 1023; //last address in eeprom for store 
 // Single radio pipe address for the 2 nodes to communicate.  Значение "трубы" передатчика и приемника ОБЯЗАНЫ быть одинаковыми.
 //const uint64_t readingPipe = 0xE8E8F0F0AALL;  // д.б. свой для каждого блока
 //const uint64_t writingPipe = 0xE8E8F0F0ABLL;  // д.б. один для всех
-const uint8_t channelNRF = 0x60;
 
 const String IR_CODE_VENT1 = "38863bc2";
 const String IR_CODE_VENT2 = "38863bca";
@@ -138,7 +137,7 @@ const byte H2 = 25;
 const byte H3 = 25;
 
 elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
-elapsedMillis saveStatistic_ms = (SAVE_STATISTIC_INTERVAL_S - REFRESH_SENSOR_INTERVAL_S * 1000 * 2) * 1000;
+elapsedMillis saveStatistic_ms = (SAVE_STATISTIC_INTERVAL_S - REFRESH_SENSOR_INTERVAL_S * 3) * 1000;
 elapsedMillis changeStatistic_ms = 0;
 elapsedMillis setLed_ms = 0;
 
@@ -228,8 +227,8 @@ void setup()
   radio.enableAckPayload();                     // Allow optional ack payloads
   //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
 
-  radio.setPayloadSize(18); //18
-  radio.setChannel(channelNRF);            // Установка канала вещания;
+  radio.setPayloadSize(32); //18
+  radio.setChannel(ChannelNRF);            // Установка канала вещания;
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
@@ -272,7 +271,7 @@ void RefreshSensorData()
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   if (refreshSensors_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
   {
-    // Serial.println("RefreshSensorData");
+     Serial.println("RefreshSensorData");
     //Serial.print("startrefreshSensors_ms ");
     //Serial.println(millis());
     h_v = dht.readHumidity();
