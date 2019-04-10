@@ -37,9 +37,8 @@
 
 
 
-#define DHT_PIN       5
-#define LGHT_SENSOR_PIN      A3
-#define ONE_WIRE_PIN 11  // DS18b20
+//#define DHT_PIN               5
+#define ONE_WIRE_PIN 11       // DS18b20
 
 
 //DHT dht(DHT_PIN, DHTTYPE);
@@ -99,6 +98,7 @@ void setup()
   sensors.getAddress(tempDeviceAddress, 0);
   sensors.setResolution(tempDeviceAddress, 12);
 
+  wdt_enable(WDTO_8S);
 }
 
 void RefreshSensorData()
@@ -146,7 +146,7 @@ void PrepareCommandNRF(byte command, byte ventSpeed, float t_set, byte scenarioV
 
   nrfResponse.roomNumber = ROOM_NUMBER;
 
-  nrfResponse.tInn = t;
+  nrfResponse.tOut = t;
 
 
   radio.flush_tx();
@@ -158,4 +158,5 @@ void loop()
   ReadCommandNRF(); //each loop try read t_out and other info from central control
   //HandleInputNrfCommand();
   RefreshSensorData();
+  wdt_reset();
 }
