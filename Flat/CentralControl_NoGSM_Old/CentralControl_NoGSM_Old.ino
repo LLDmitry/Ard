@@ -49,6 +49,9 @@
 //#define REGISTRATOR_PIN 15// активация регистратора
 //#define ADD_DEVICE_PIN 16 // дополнительное устройство
 
+#define VENT_SPEED1_PIN 8
+#define VENT_SPEED2_PIN 9
+
 #define DHTTYPE DHT22
 
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
@@ -115,9 +118,6 @@ const byte ADR_EEPROM_SCENARIO3_NAGREV = 120;   //начало температ�
 const byte ADR_EEPROM_SCENARIO1_VENT = 200;     //начало адресов вент по комнатам для SCENARIO1_VENT; а последнем адресе - период работы сценария, часов
 const byte ADR_EEPROM_SCENARIO2_VENT = 210;     //начало вент для SCENARIO2_VENT
 const byte ADR_EEPROM_SCENARIO3_VENT = 220;     //начало вент для SCENARIO3_VENT
-
-const byte ROOM_NUMBER_OUT_T1 = 1;
-const byte ROOM_NUMBER_OUT_T2 = 3;
 
 bool useRecallMeMode = false;          // true - will recall for receiing DTMF, false - will answer for receiing DTMF
 byte incomingPhoneID;
@@ -222,8 +222,8 @@ byte arRoomsAlarmNotification[5] = {
 };
 
 
-float t_out1 = 99.9;   //температура снаружи место1
-float t_out2 = 99.9;   //температура снаружи место2
+float t_out1;   //температура снаружи место1
+float t_out2;   //температура снаружи место2
 float t_out;    //температура снаружи (минимальная место1 или место2)
 float t_vent;   //температура внутри вентиляционной системы (в блоке разветвления воздуха) для расчета (t_vent - t_out)
 float t_unit;   //температура блока управления (в самой горячей точке)
@@ -306,6 +306,8 @@ void setup()
   //  pinMode(U_220_PIN, INPUT);
   //  pinMode(BTTN_PIN, INPUT_PULLUP);
   pinMode(BZZ_PIN, OUTPUT);
+  pinMode(VENT_SPEED1_PIN, OUTPUT);
+  pinMode(VENT_SPEED2_PIN, OUTPUT);
 
   //  pinMode(ADD_DEVICE_PIN, OUTPUT);
   //  pinMode(MIC_PIN, OUTPUT);
@@ -1639,18 +1641,6 @@ void ParseAndHandleInputNrfCommand()
   alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
   t_inn[nrfResponse.roomNumber] = nrfResponse.tInn;
   co2[nrfResponse.roomNumber] = nrfResponse.co2;
-
-  if (nrfResponse.roomNumber == ROOM_NUMBER_OUT_T1)
-  {
-    t_out1 = nrfResponse.tOut;
-  }
-
-  if (nrfResponse.roomNumber == ROOM_NUMBER_OUT_T2)
-  {
-    t_out2 = nrfResponse.tOut;
-  }
-
-
   //      h[nrfResponse.roomNumber] = nrfResponse.h;
   //      t_set[nrfResponse.roomNumber] = nrfResponse.t_set;
   //
@@ -1734,16 +1724,17 @@ void RefreshSensorData()
   if (lastRefreshSensor_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
   {
     Serial.println("RefreshSensorData");
-    //sensors.requestTemperatures();
+    sensors.requestTemperatures();
     //    //float realTemper = sensors.getTempCByIndex(0);
     //    //t_inn = sensors.getTempC(innerTempDeviceAddress);
-    //    t_out1 = sensors.getTempC(outer1TempDeviceAddress);
+    t_out1 = sensors.getTempC(outer1TempDeviceAddress);
     //    t_out2 = sensors.getTempC(outer2TempDeviceAddress);
     //    t_vent = sensors.getTempC(ventTempDeviceAddress);
     t_vent = t_out1;
     //    t_unit = sensors.getTempC(unitTempDeviceAddress);
     //
-    t_out = t_out1 < t_out2 ? t_out1 : t_out1;
+    //    t_out = t_out1 < t_out2 ? t_out1 : t_out1;
+    t_out = t_out1;
     //    h[ROOM_GOST] = dht.readHumidity();
     //    t_inn[ROOM_GOST] = dht.readTemperature();
     p_v = 0.0075 * bmp.readPressure();
@@ -1807,11 +1798,21 @@ void VentControl()
       modeVent[ROOM_BED] = V_SPEED2;
       break;
   }
-  bool speed1 = (modeVent[ROOM_BED] == V_SPEED1 || modeVent[ROOM_BED] == V_AUTO_SPEED1);
-  bool speed2 = (modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_AUTO_SPEED2);
+  bool sped1 = (modeVent[ROOM_BED] == V_SPEED1 || modeVent[ROOM_BED] == V_AUTO_SPEED1);
+  bool sped2 = (modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_AUTO_SPEED2);
+  //  Serial.print("sped1 =");
+  //  Serial.println(sped1);
+  //  Serial.print("sped2 =");
+  //  Serial.println(sped2);
 
-  nrfRequest.Command = RQ_T_COMMAND;
-  nrfRequest.VentSpeed = speed1 ? 1 : speed2 ? 2 : 0;
+  //  if (!sped1 && !sped2)
+  //  {
+  //    Serial.print("low co2 =");
+  //    Serial.println(co2[1]);
+  //  }
+
+  digitalWrite(VENT_SPEED1_PIN, sped1);
+  digitalWrite(VENT_SPEED2_PIN, sped2);
 }
 
 //void NagrevControl()
