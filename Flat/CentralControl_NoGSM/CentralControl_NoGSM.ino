@@ -1810,8 +1810,8 @@ void VentControl()
   bool speed1 = (modeVent[ROOM_BED] == V_SPEED1 || modeVent[ROOM_BED] == V_AUTO_SPEED1);
   bool speed2 = (modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_AUTO_SPEED2);
 
-  nrfRequest.Command = RQ_T_COMMAND;
-  nrfRequest.VentSpeed = speed1 ? 1 : speed2 ? 2 : 0;
+  nrfRequest.Command = RQ_VENT;
+  nrfRequest.ventSpeed = speed1 ? 1 : speed2 ? 2 : 0;
 }
 
 //void NagrevControl()
