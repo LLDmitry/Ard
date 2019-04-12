@@ -36,12 +36,11 @@
 #define RNF_SCK       13
 
 
-
-//#define DHT_PIN               5
 #define ONE_WIRE_PIN 11       // DS18b20
 
+#define VENT_SPEED1_PIN 8
+#define VENT_SPEED2_PIN 9
 
-//DHT dht(DHT_PIN, DHTTYPE);
 
 const byte ROOM_NUMBER = 3; //1,2,3,4; 0 -main control (if exists)
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;  //2 мин
@@ -93,6 +92,9 @@ void setup()
   sensors.getAddress(tempDeviceAddress, 0);
   sensors.setResolution(tempDeviceAddress, 12);
 
+  pinMode(VENT_SPEED1_PIN, OUTPUT);
+  pinMode(VENT_SPEED2_PIN, OUTPUT);
+
   wdt_enable(WDTO_8S);
 }
 
@@ -128,9 +130,24 @@ void ReadCommandNRF()
       Serial.println(nrfRequest.tOut);
     }
     radio.startListening();   // Now, resume listening so we catch the next packets.
+    ParseAndHandleInputNrfCommand();
     nrfResponse.Command == RSP_NO;
     nrfResponse.tOut = 99.9;
   }
+}
+
+void ParseAndHandleInputNrfCommand()
+{
+  nrfCommandProcessing = true;  
+  Serial.print("roomNumber= ");
+  Serial.println(nrfRequest.roomNumber);  
+  VentControl();   
+}
+
+void VentControl()
+{  
+  digitalWrite(VENT_SPEED1_PIN, nrfRequest.ventSpeed==1);
+  digitalWrite(VENT_SPEED2_PIN, nrfRequest.ventSpeed==2);
 }
 
 //send room data
