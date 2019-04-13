@@ -30,6 +30,9 @@
 #include <RF24_config.h>
 #include <stdio.h> // for function sprintf
 #include <IRremote.h>
+#include <avr/sleep.h>
+#include <avr/wdt.h>
+#include <util/delay.h>
 
 #define DHTTYPE DHT22
 
@@ -46,7 +49,7 @@
 #define RNF_CSN_PIN   7
 #define RNF_MOSI      11  //SDA
 #define RNF_MISO      12
-#define RNF_SCK       13  
+#define RNF_SCK       13
 
 #define TFT_CS        10                  // Указываем пины cs
 #define TFT_DC        9                   // Указываем пины dc (A0)
@@ -244,6 +247,8 @@ void setup()
   pinMode(BZZ_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode( LGHT_SENSOR_PIN, INPUT);
+
+  wdt_enable(WDTO_8S);
 }
 
 //void AutoChangeShowMode()
@@ -271,7 +276,7 @@ void RefreshSensorData()
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   if (refreshSensors_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
   {
-     Serial.println("RefreshSensorData");
+    Serial.println("RefreshSensorData");
     //Serial.print("startrefreshSensors_ms ");
     //Serial.println(millis());
     h_v = dht.readHumidity();
@@ -819,4 +824,5 @@ void loop()
   ChangeStatistic();
   CheckIR();
   SetLed();
+  wdt_reset();
 }

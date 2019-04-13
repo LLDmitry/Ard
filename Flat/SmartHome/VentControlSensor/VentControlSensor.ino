@@ -138,16 +138,15 @@ void ReadCommandNRF()
 
 void ParseAndHandleInputNrfCommand()
 {
-  nrfCommandProcessing = true;  
   Serial.print("roomNumber= ");
-  Serial.println(nrfRequest.roomNumber);  
-  VentControl();   
+  Serial.println(nrfRequest.roomNumber);
+  VentControl();
 }
 
 void VentControl()
-{  
-  digitalWrite(VENT_SPEED1_PIN, nrfRequest.ventSpeed==1);
-  digitalWrite(VENT_SPEED2_PIN, nrfRequest.ventSpeed==2);
+{
+  digitalWrite(VENT_SPEED1_PIN, nrfRequest.ventSpeed == 1);
+  digitalWrite(VENT_SPEED2_PIN, nrfRequest.ventSpeed == 2);
 }
 
 //send room data

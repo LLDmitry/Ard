@@ -372,8 +372,8 @@ void setup()
   //  RTC.set(now());
 
   Serial.println("Setup done");
-  //
-  //  wdt_enable(WDTO_8S);
+
+  wdt_enable(WDTO_8S);
 }
 
 void RadioSetup()
@@ -1541,7 +1541,7 @@ void NrfCommunication()
 {
   if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
   {
-    for (byte iRoom = 0; iRoom < 3; iRoom++)
+    for (byte iRoom = 0; iRoom <= 3; iRoom++)
     {
       Serial.print(iRoom);
       Serial.print(" SendCommandNRF ");
@@ -1870,5 +1870,5 @@ void loop()
   //  Check220();
   //  DisplayData(0);
   //
-  //  wdt_reset();
+  wdt_reset();
 }
