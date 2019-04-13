@@ -23,9 +23,7 @@
 #include <avr/sleep.h>
 #include <avr/wdt.h>
 #include <util/delay.h>
-
-#define DHTTYPE DHT22
-
+#include <Adafruit_BMP085.h> //давление Vcc – +5в; SDA – (A4);SCL - (A5)
 
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
@@ -36,10 +34,13 @@
 #define RNF_SCK       13
 
 
-#define ONE_WIRE_PIN 11       // DS18b20
+#define ONE_WIRE_PIN 5       // DS18b20
 
 #define VENT_SPEED1_PIN 8
 #define VENT_SPEED2_PIN 9
+
+#define P1_PIN 5
+#define P2_PIN 4
 
 
 const byte ROOM_NUMBER = 3; //1,2,3,4; 0 -main control (if exists)
@@ -50,6 +51,8 @@ elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 
 
 float t = 0.0f;
+int p1_v = 0;    //давление до фильтра
+int p2_v = 0;    //давление после фильтра
 
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
@@ -57,7 +60,7 @@ NRFRequest nrfRequest;
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
-
+Adafruit_BMP085 bmp;
 
 OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
@@ -92,8 +95,14 @@ void setup()
   sensors.getAddress(tempDeviceAddress, 0);
   sensors.setResolution(tempDeviceAddress, 12);
 
+  bmp.begin();
+
   pinMode(VENT_SPEED1_PIN, OUTPUT);
   pinMode(VENT_SPEED2_PIN, OUTPUT);
+
+  pinMode(P1_PIN, OUTPUT);
+  pinMode(P2_PIN, OUTPUT);
+
 
   wdt_enable(WDTO_8S);
 }
@@ -107,7 +116,18 @@ void RefreshSensorData()
 
     sensors.requestTemperatures();
     t = sensors.getTempCByIndex(0);
-    //t = dht.readTemperature();
+
+    digitalWrite(P1_PIN, HIGH);
+    delay(10);
+    bmp.begin();
+    p1_v = 0.0075 * bmp.readPressure();
+    digitalWrite(P1_PIN, LOW);
+
+    digitalWrite(P2_PIN, HIGH);
+    delay(10);
+    bmp.begin();
+    p2_v = 0.0075 * bmp.readPressure();
+    digitalWrite(P2_PIN, LOW);
 
     PrepareCommandNRF();
 
