@@ -133,7 +133,7 @@ bool ReadCommandNRF()
     }
     radio.startListening();   // Now, resume listening so we catch the next packets.
     nrfResponse.Command == RSP_NO;
-    nrfResponse.tOut = 99.9;
+    //0    nrfResponse.tOut = 99.9;
     return true;
   }
 }
@@ -146,7 +146,7 @@ void PrepareCommandNRF()
 
   nrfResponse.roomNumber = ROOM_NUMBER;
 
-  nrfResponse.tOut = t;
+  //00  nrfResponse.tOut = t;
 
   radio.flush_tx();
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
@@ -158,25 +158,25 @@ void arduino_sleep()
   cli();                               //disable interrupts for time critical operations below
 
   power_all_disable();                 //disable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
-  /*              
-  power_adc_disable();                 //disable ADC
-  power_timer0_disable();              //disable Timer0
-  power_timer1_disable();              //disable Timer2
-  power_usi_disable();                 //disable the Universal Serial Interface module
+  /*
+    power_adc_disable();                 //disable ADC
+    power_timer0_disable();              //disable Timer0
+    power_timer1_disable();              //disable Timer2
+    power_usi_disable();                 //disable the Universal Serial Interface module
   */
   set_sleep_mode(SLEEP_MODE_PWR_DOWN); //set sleep type
 
-  #if defined(BODS) && defined(BODSE)  //if MCU has bulit-in BOD it will be disabled, ATmega328P, ATtiny85, AVR_ATtiny45, ATtiny25  
+#if defined(BODS) && defined(BODSE)  //if MCU has bulit-in BOD it will be disabled, ATmega328P, ATtiny85, AVR_ATtiny45, ATtiny25  
   sleep_bod_disable();                 //disable Brown Out Detector (BOD) before going to sleep, saves more power
-  #endif
+#endif
 
   sei();                               //re-enable interrupts
 
   sleep_mode();                        /*
-                                         system stops & sleeps here, it automatically sets Sleep Enable (SE) bit, 
+                                         system stops & sleeps here, it automatically sets Sleep Enable (SE) bit,
                                          so sleep is possible, goes to sleep, wakes-up from sleep after interrupt,
                                          if interrupt is enabled or WDT enabled & timed out, than clears the SE bit.
-                                       */
+*/
 
   /*** NOTE: sketch will continue from this point after sleep ***/
 }
@@ -186,16 +186,16 @@ void setup_watchdog(byte sleep_time)
   cli();                           //disable interrupts for time critical operations below
 
   wdt_enable(sleep_time);          //set WDCE, WDE change prescaler bits
-  
+
   MCUSR &= ~_BV(WDRF);             //must be cleared first, to clear WDE
 
-  #if defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny87__) || defined(__AVR_ATtiny167__)
+#if defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny87__) || defined(__AVR_ATtiny167__)
   WDTCR  |= _BV(WDCE) & ~_BV(WDE); //set WDCE first, clear WDE second, changes have to be done within 4-cycles
   WDTCR  |= _BV(WDIE);             //set WDIE to Watchdog Interrupt
-  #else
+#else
   WDTCSR |= _BV(WDCE) & ~_BV(WDE); //set WDCE first, clear WDE second, changes have to be done within 4-cycles
   WDTCSR |= _BV(WDIE);             //set WDIE to Watchdog Interrupt
-  #endif
+#endif
 
   sei();                           //re-enable interrupts
 }
@@ -216,7 +216,7 @@ ISR(WDT_vect)
 
 void loop()
 {
-   
+
   if (isActiveWork)
   {
     RefreshSensorData();
@@ -224,27 +224,30 @@ void loop()
   }
   else
   {
-   while (watchdogCounter < 4) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
+    radio.powerDown();
+    while (watchdogCounter < 4) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
     {
       //all_pins_output();
       arduino_sleep();
     }
 
     //wdt_disable();            //disable & stop wdt timer
-  watchdogCounter = 0;        //reset counter
+    watchdogCounter = 0;        //reset counter
 
-  power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
-  /*
-  power_adc_enable();         //enable ADC
-  power_timer0_enable();      //enable Timer0
-  power_timer1_enable();      //enable Timer1
-  power_usi_enable();         //enable the Universal Serial Interface module
-  */
-  delay(5);                   //to settle down ADC & peripheries
+    radio.powerUp();
 
-  isActiveWork = true;
+    power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
 
-  //wdt_enable(WDTO_8S);      //enable wdt timer
+    /*
+      power_adc_enable();         //enable ADC
+      power_timer0_enable();      //enable Timer0
+      power_timer1_enable();      //enable Timer1
+      power_usi_enable();         //enable the Universal Serial Interface module
+    */
+    delay(5);                   //to settle down ADC & peripheries
+    isActiveWork = true;
+
+    //wdt_enable(WDTO_8S);      //enable wdt timer
   }
 }
 
