@@ -1743,7 +1743,7 @@ void RefreshSensorData()
     t_vent = t_out1;
     //    t_unit = sensors.getTempC(unitTempDeviceAddress);
     //
-    t_out = t_out1 < t_out2 ? t_out1 : t_out1;
+    t_out = t_out1 < t_out2 ? t_out1 : t_out2;
     //    h[ROOM_GOST] = dht.readHumidity();
     //    t_inn[ROOM_GOST] = dht.readTemperature();
     p_v = 0.0075 * bmp.readPressure();

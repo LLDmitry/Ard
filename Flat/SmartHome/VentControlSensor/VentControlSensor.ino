@@ -10,7 +10,7 @@
 
 #include <NrfCommands.h>
 #include "SoftwareSerial.h"
-#include "DHT.h"
+//#include "DHT.h"
 #include <elapsedMillis.h>
 #include <SPI.h>                 // Подключаем библиотеку SPI
 #include <Wire.h>
@@ -39,8 +39,8 @@
 #define VENT_SPEED1_PIN 8
 #define VENT_SPEED2_PIN 9
 
-#define P1_PIN 5
-#define P2_PIN 4
+#define P1_PIN 5  //до фильтра
+#define P2_PIN 4  //после фильтра
 
 
 const byte ROOM_NUMBER = 3; //1,2,3,4; 0 -main control (if exists)
@@ -50,7 +50,7 @@ const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;  //2 мин
 elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 
 
-float t = 0.0f;
+float t_out = 0.0f;
 int p1_v = 0;    //давление до фильтра
 int p2_v = 0;    //давление после фильтра
 
@@ -115,7 +115,7 @@ void RefreshSensorData()
     Serial.println("RefreshSensorData");
 
     sensors.requestTemperatures();
-    t = sensors.getTempCByIndex(0);
+    t_out = sensors.getTempCByIndex(0);
 
     digitalWrite(P1_PIN, HIGH);
     delay(10);
@@ -177,7 +177,7 @@ void PrepareCommandNRF()
 
   nrfResponse.roomNumber = ROOM_NUMBER;
 
-  nrfResponse.tOut = t;
+  nrfResponse.tOut = t_out;
 
   radio.flush_tx();
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1

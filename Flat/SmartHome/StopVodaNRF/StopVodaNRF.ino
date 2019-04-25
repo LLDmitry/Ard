@@ -2,7 +2,7 @@
 #include <NrfCommands.h>  // C:\Program Files (x86)\Arduino\libraries\NrfCommands
 #include "sav_button.h" // Библиотека работы с кнопками
 #include <elapsedMillis.h>
-#include "DHT.h"
+//#include "DHT.h"
 #include <Arduino.h>
 #include <avr/wdt.h>
 #include <RF24.h>
@@ -10,15 +10,15 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#define DHTTYPE DHT22
+//#define DHTTYPE DHT22
 
 
-#define DHT_PIN       5
+#define DHT_PIN       6
 #define BTN_PIN       3
 #define SOLENOID_PIN  8
 #define BUZZ_PIN      4
 #define VODA_PIN      2
-#define ONE_WIRE_PIN  6    // DS18b20
+#define ONE_WIRE_PIN  5    // DS18b20
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 #define RNF_CE_PIN    10
@@ -34,7 +34,7 @@ const unsigned long MANUAL_OPEN_DURATION_SEC = 10800; //3 hours
 const unsigned long MANUAL_CLOSE_DURATION_SEC = 10; //10s
 const unsigned long CHECK_VODA_PERIOD_SEC = 3;
 const unsigned long ALARM_INTERVAL_SEC = 2;
-const uint32_t REFRESH_SENSOR_INTERVAL_S = 30;  //1 мин
+const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
 
@@ -42,6 +42,7 @@ SButton btn(BTN_PIN, 50, 1000, 5000, 15000);
 
 OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
+DeviceAddress InnTempDeviceAddress;
 DeviceAddress ColdVodaTempDeviceAddress;
 DeviceAddress HotVodaTempDeviceAddress;
 
@@ -51,7 +52,7 @@ elapsedMillis manualCloseTime_ms;
 elapsedMillis alarmInterval_ms;
 elapsedMillis lastRefreshSensor_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 
-byte h_v = 0;
+//byte h_v = 0;
 float t_inn = 0.0f;
 float t_cold = 0.0f;
 float t_hot = 0.0f;
@@ -67,7 +68,7 @@ volatile boolean isAlarm = false;
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
 
-DHT dht(DHT_PIN, DHTTYPE);
+//DHT dht(DHT_PIN, DHTTYPE);
 
 void setup()
 {
@@ -104,8 +105,10 @@ void setup()
   radio.printDetails();
 
   sensors.begin();
-  sensors.getAddress(ColdVodaTempDeviceAddress, 0);
-  sensors.getAddress(HotVodaTempDeviceAddress, 1);
+  sensors.getAddress(InnTempDeviceAddress, 0);
+  sensors.getAddress(ColdVodaTempDeviceAddress, 1);
+  sensors.getAddress(HotVodaTempDeviceAddress, 2);
+  sensors.setResolution(InnTempDeviceAddress, 12);
   sensors.setResolution(ColdVodaTempDeviceAddress, 10);
   sensors.setResolution(HotVodaTempDeviceAddress, 10);
 
@@ -126,9 +129,9 @@ void PrepareCommandNRF()
   nrfResponse.roomNumber = ROOM_NUMBER;
   nrfResponse.alarmType = (vodaMode == 1 ? ALR_VODA : ALR_NO);
   nrfResponse.tInn = t_inn;
-  nrfResponse.t1 = t_inn;
+  nrfResponse.t1 = t_cold;
   nrfResponse.t2 = t_hot;
-  nrfResponse.h = h_v;
+  //nrfResponse.h = h_v;
 
   radio.flush_tx();
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
@@ -142,14 +145,15 @@ void RefreshSensorData()
   {
     //    h_v = dht.readHumidity();
     //    t_inn = dht.readTemperature();
-    lastRefreshSensor_ms = 0;
-    t_inn = millis() / 1000;
+    //t_inn = millis() / 1000;
 
     sensors.requestTemperatures();
+    t_inn = sensors.getTempC(InnTempDeviceAddress);
     t_cold = sensors.getTempC(ColdVodaTempDeviceAddress);
     t_hot = sensors.getTempC(HotVodaTempDeviceAddress);
 
     PrepareCommandNRF();
+    lastRefreshSensor_ms = 0;
   }
 }
 
