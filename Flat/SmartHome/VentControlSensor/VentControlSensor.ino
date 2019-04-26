@@ -43,7 +43,18 @@
 #define P2_PIN 4  //после фильтра
 
 
-const byte ROOM_NUMBER = 3; //1,2,3,4; 0 -main control (if exists)
+
+//const byte ROOM_CENTRAL = 0;
+//const byte ROOM_GOST = 1;
+//const byte ROOM_BED = 2;
+//const byte ROOM_VANNA1 = 3;
+//const byte ROOM_VANNA2 = 4;
+//const byte ROOM_CHILD = 5;
+//const byte ROOM_CHILD_SENSOR = 5;
+//const byte ROOM_VENT = 6;
+//const byte ROOM_HALL = 7;
+const byte ROOM_NUMBER = 6;
+
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;  //2 мин
 
 

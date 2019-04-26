@@ -87,11 +87,17 @@ const unsigned long NAGREV_CONTROL_PERIOD_S = 60;
 const unsigned long AUTO_REFRESH_DISPLAY_PERIOD_S = 10;
 const unsigned long INPUT_COMMAND_DISPLAY_PERIOD_S = 60;
 
-const byte ROOM_GOST = 0;
-const byte ROOM_BED = 1;
-const byte ROOM_VANNA1 = 2;
-const byte ROOM_VANNA2 = 3;
-const byte ROOM_HALL = 4;
+const byte ROOM_CENTRAL = 0;
+const byte ROOM_GOST = 1;
+const byte ROOM_BED = 2;
+const byte ROOM_VANNA1 = 3;
+const byte ROOM_VANNA2 = 4;
+const byte ROOM_CHILD = 5;
+const byte ROOM_CHILD_SENSOR = 5;
+const byte ROOM_VENT = 6;
+const byte ROOM_HALL = 7;
+
+const byte ROOMS_NUMBER = 7;
 
 //Параметры комфорта
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
@@ -116,10 +122,10 @@ const byte ADR_EEPROM_SCENARIO1_VENT = 200;     //начало адресов в
 const byte ADR_EEPROM_SCENARIO2_VENT = 210;     //начало вент для SCENARIO2_VENT
 const byte ADR_EEPROM_SCENARIO3_VENT = 220;     //начало вент для SCENARIO3_VENT
 
-const byte ROOM_NUMBER_OUT_T1 = 1;
-const byte ROOM_NUMBER_OUT_T2 = 3;
+const byte ROOM_NUMBER_OUT_T1 = ROOM_VENT;
+const byte ROOM_NUMBER_OUT_T2 = ROOM_CHILD_SENSOR;
 
-bool useRecallMeMode = false;          // true - will recall for receiing DTMF, false - will answer for receiing DTMF
+bool useRecallMeMode = false;          // true - will recall for receving DTMF, false - will answer for receving DTMF
 byte incomingPhoneID;
 String incomingPhone;
 byte ringNumber;
@@ -210,10 +216,10 @@ float t_set[5];         //желаемая температура по комн�
 float vent_set[5];      //желаемая вентиляция по комнатам
 boolean nagrevStatus[5];//состояние батарей по комнатам (true/false)
 EnModeVent modeVent[5]; //вентиляция по комнатам
-byte alarmStatus[5];    //alarm, по комнатам  //0-none, 1-medium, 2-serious
-byte alarmStatusNotification[5][2];    //alarm, раздать по комнатам:  статус//0-none, 1-medium, 2-serious + номера комнат
+byte alarmStatus[ROOMS_NUMBER];    //alarm, по комнатам  //0-none, 1-medium, 2-serious
+byte alarmStatusNotification[ROOMS_NUMBER][2];    //alarm, раздать по комнатам:  статус//0-none, 1-medium, 2-serious + номера комнат
 //номера комнат подписчиков и поставщиков Alert bitRead(a, 0)
-byte arRoomsAlarmNotification[5] = {
+byte arRoomsAlarmNotification[ROOMS_NUMBER] = {
   0b00111010,
   0b00111010,
   0b00000000,
@@ -355,7 +361,7 @@ void setup()
   _delay_ms(2000);
   //  digitalWrite(BZZ_PIN, LOW);
   //
-  for (byte iRoom = 0; iRoom < 5; iRoom++)
+  for (byte iRoom = 0; iRoom < ROOMS_NUMBER; iRoom++)
   {
     modeVent[iRoom] = V_AUTO_OFF;
   }
@@ -1541,7 +1547,7 @@ void NrfCommunication()
 {
   if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
   {
-    for (byte iRoom = 0; iRoom <= 3; iRoom++)
+    for (byte iRoom = 1; iRoom <= ROOMS_NUMBER; iRoom++)
     {
       Serial.print(iRoom);
       Serial.print(" SendCommandNRF ");
@@ -1555,12 +1561,12 @@ void NrfCommunication()
 
 void FillAlarmStatuses()
 {
-  memset(alarmStatusNotification, 0, 5); // обнуляем массив
-  for (byte iCheckRoom = 0; iCheckRoom <= 5; iCheckRoom++)
+  memset(alarmStatusNotification, 0, ROOMS_NUMBER); // обнуляем массив
+  for (byte iCheckRoom = 0; iCheckRoom <= ROOMS_NUMBER; iCheckRoom++)
   {
     if (alarmStatus[iCheckRoom] > 0)
     {
-      for (byte iNotifRoom = 0; iNotifRoom <= 5; iNotifRoom++)
+      for (byte iNotifRoom = 0; iNotifRoom <= ROOMS_NUMBER; iNotifRoom++)
       {
         if (bitRead(arRoomsAlarmNotification[iNotifRoom], iCheckRoom))
         {
