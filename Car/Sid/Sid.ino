@@ -84,9 +84,9 @@ elapsedMillis lowVoltageDecision_ms;
 elapsedMillis manualWorkStopEngine_ms;
 elapsedMillis timeReduceNagrevSid1_ms;
 elapsedMillis timeReduceNagrevSid2_ms;
-int numberLowVoltageSleeps = 0;
-int numberStopEngineSleeps = 0;
-int numberNoActionsSleeps = 0;
+unsigned long numberLowVoltageSleeps = 0;
+unsigned long numberStopEngineSleeps = 0;
+unsigned long numberNoActionsSleeps = 0;
 
 OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
@@ -101,6 +101,7 @@ ISR(WDT_vect)
 
 void setup()
 {
+  wdt_disable();
   Serial.begin(9600);
   Serial.println("STARTING ...");
 
@@ -131,6 +132,7 @@ void setup()
   sensors.setResolution(tempDeviceAddress, 10);
 
   _delay_ms(1000);
+  wdt_enable(WDTO_8S);
 }
 
 
@@ -301,13 +303,13 @@ void RefreshSensors()
 
 void Socket12Control()
 {
-  //  _delay_ms(100);
-  //  Serial.println("");
-  //  Serial.print("NAS=");
-  //  Serial.println(numberNoActionsSleeps);
-  //  Serial.print("SES=");
-  //  Serial.println(numberStopEngineSleeps);
-  //  _delay_ms(100);
+  _delay_ms(100);
+  Serial.println("");
+  Serial.print("NAS=");
+  Serial.println(numberNoActionsSleeps);
+  Serial.print("SES=");
+  Serial.println(numberStopEngineSleeps);
+  _delay_ms(100);
   socket12Mode = !isLowVoltage && (isEngineWork || isManualNagrevWork ||
                                    (!isEngineWork && (numberNoActionsSleeps * 8 < TIME_12V_WORK_AFTER_MANUAL_START_S) ||
                                     (!isEngineWork && (numberStopEngineSleeps * 8 < TIME_12V_WORK_AFTER_STOP_ENGINE_S))));
@@ -613,5 +615,5 @@ void loop()
     numberNoActionsSleeps += 1;
     checkEngineStatus_ms = PERIOD_CHECK_ENGINE_STATUS_S * 1000 + 1; //as result, will check if engine still stop each sleep loop
   }
+  wdt_reset();
 }
-

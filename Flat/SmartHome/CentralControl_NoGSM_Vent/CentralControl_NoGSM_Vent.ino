@@ -99,10 +99,11 @@ const byte ROOM_HALL = 4;
 //Параметры комфорта
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
 const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;
+const float MAX_COMFORT_ROOM_TEMP = 23.5;
 const float BORDER_WINTER_SUMMER = 10; // +10c
-const int PPM_SWITCH_ON_MAX_VENT = 900;
-const int PPM_SWITCH_ON_VENT = 550;
-const int PPM_SWITCH_OFF_VENT = 520;
+const int PPM_SWITCH_ON_MAX_VENT = 800;
+const int PPM_SWITCH_ON_VENT = 500;
+const int PPM_SWITCH_OFF_VENT = 470;
 
 const byte INDEX_ALARM_PNONE = 1;                   //index in phonesEEPROM[5]
 const byte MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES = 3;  //После MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES неудачных попыток (с вводом неверного пароля) за последние 10 мин, блокируем (не берем трубку) звонки с любых неизвестных номеров на 30мин либо до звонка с известного номера (что раньше).
@@ -1781,6 +1782,10 @@ void VentControl()
           //          Serial.println("OFF2");
           //          Serial.print("low co2 =");
           //          Serial.println(co2[1]);
+        }
+        if (t_inn[1] > MAX_COMFORT_ROOM_TEMP && t_inn[1] > t_out) //t_inn too hot
+        {
+          modeVent[ROOM_BED] = (modeVent[ROOM_BED] == V_AUTO_OFF ? V_AUTO_SPEED1 : V_AUTO_SPEED2);         
         }
         //        Serial.print("modeVent2 =");
         //        Serial.println(modeVent[ROOM_BED]);
