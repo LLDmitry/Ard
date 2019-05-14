@@ -25,6 +25,7 @@ const String IR_OPEN_CODE = "38863bc2";
 const String IR_CLOSE_CODE = "38863bca";
 const String BTN_OPEN_CODE = "sls"; //s-short, l - long click
 const String BTN_CLOSE_CODE = "lss"; //s-short, l - long click
+const String BTN_SETUP_CODE = "sss"; //s-short, l - long click
 const int IMPULSE_ZAMOK_MS = 500;
 
 const unsigned long DELAY_PERIOD_S = 1;
@@ -35,6 +36,9 @@ boolean isProcessBtnCode;
 boolean isActiveWork = true;
 boolean prevIgnitionStatus = false;
 String resultBtnCode;
+boolean setupMode = false;
+String setupPart1 = "";
+String setupPart2 = "";
 
 elapsedMillis readBttn_ms;
 elapsedMillis afterSwitchOff_ms;
@@ -127,20 +131,43 @@ void loop()
   {
     String res = String(results.value, HEX);
     Serial.println(res);
-    if (res == IR_OPEN_CODE)
+    if (setupMode)
     {
-      _delay_ms(DELAY_PERIOD_S * 1000);
-      ZamokOpen();
+      if (res == "38863bda") // && setupPart1 == "" && setupPart2 == "")
+      {
+        Serial.println("YES!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        Serial.println(setupPart1);
+        Serial.println(setupPart2);
+        digitalWrite(BZZ_PIN, HIGH);
+        _delay_ms(500);
+        digitalWrite(BZZ_PIN, LOW);
+        setupPart1 = "";
+        setupPart2 = "";
+      }
+      else
+      {
+        setupPart1 = setupPart2;
+        setupPart2 = res;
+      }
     }
-    else if (res == IR_CLOSE_CODE)
+    else //normal mode
     {
-      _delay_ms(DELAY_PERIOD_S * 1000);
-      ZamokClose();
+      if (res == IR_OPEN_CODE)
+      {
+        _delay_ms(DELAY_PERIOD_S * 1000);
+        ZamokOpen();
+      }
+      else if (res == IR_CLOSE_CODE)
+      {
+        _delay_ms(DELAY_PERIOD_S * 1000);
+        ZamokClose();
+      }
+      else if (res != "0") //wrong code, do pause
+      {
+        _delay_ms(5000);
+      }
     }
-    else if (res != "0") //wrong code, do pause
-    {
-      _delay_ms(5000);
-    }
+
     irrecv.resume(); // Receive the next value
   }
 
@@ -151,6 +178,8 @@ void loop()
       ZamokClose();
     else if (resultBtnCode == BTN_OPEN_CODE)
       ZamokOpen();
+    else if (resultBtnCode == BTN_SETUP_CODE)
+      SetupMode();
     else//wrong code, do pause
     {
       Serial.println("wrong");
@@ -172,9 +201,9 @@ void loop()
     if (prevIgnitionStatus)
     {
       Serial.println("IGNITION Off");
-      prevIgnitionStatus = false;      
+      prevIgnitionStatus = false;
       afterSwitchOff_ms = 0;
-    }    
+    }
     if (afterSwitchOff_ms > AFTER_SWITCH_OFF_PERIOD_S * 1000)
       isActiveWork = false; //reset flag in the end of work
   }
@@ -230,5 +259,22 @@ void ZamokOpen()
   _delay_ms(300);
   digitalWrite(BZZ_PIN, HIGH);
   _delay_ms(300);
+  digitalWrite(BZZ_PIN, LOW);
+}
+
+
+void SetupMode()
+{
+  Serial.println("ZamokClose");
+  digitalWrite(CLOSE_PIN, HIGH);
+  _delay_ms(IMPULSE_ZAMOK_MS);
+  digitalWrite(CLOSE_PIN, LOW);
+  setupMode = !setupMode;
+
+  digitalWrite(BZZ_PIN, HIGH);
+  if (setupMode)
+    _delay_ms(1000);
+  else
+    _delay_ms(200);
   digitalWrite(BZZ_PIN, LOW);
 }

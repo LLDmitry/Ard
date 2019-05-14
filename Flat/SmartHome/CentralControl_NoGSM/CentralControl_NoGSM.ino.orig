@@ -104,9 +104,15 @@ const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
 const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;
 const float MAX_COMFORT_ROOM_TEMP = 23.5;
 const float BORDER_WINTER_SUMMER = 10; // +10c
+<<<<<<< HEAD
+const int PPM_SWITCH_ON_MAX_VENT = 600;
+const int PPM_SWITCH_ON_VENT = 450;
+const int PPM_SWITCH_OFF_VENT = 420;
+=======
 const int PPM_SWITCH_ON_MAX_VENT = 800;
 const int PPM_SWITCH_ON_VENT = 500;
 const int PPM_SWITCH_OFF_VENT = 470;
+>>>>>>> e2a73a10fb916a440ab7e6faf25b0d3c890ea2a2
 
 const byte INDEX_ALARM_PNONE = 1;                   //index in phonesEEPROM[5]
 const byte MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES = 3;  //После MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES неудачных попыток (с вводом неверного пароля) за последние 10 мин, блокируем (не берем трубку) звонки с любых неизвестных номеров на 30мин либо до звонка с известного номера (что раньше).
