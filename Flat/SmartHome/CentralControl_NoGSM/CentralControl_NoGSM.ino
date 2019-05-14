@@ -103,9 +103,9 @@ const byte ROOMS_NUMBER = 7;
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
 const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;
 const float BORDER_WINTER_SUMMER = 10; // +10c
-const int PPM_SWITCH_ON_MAX_VENT = 900;
-const int PPM_SWITCH_ON_VENT = 550;
-const int PPM_SWITCH_OFF_VENT = 520;
+const int PPM_SWITCH_ON_MAX_VENT = 600;
+const int PPM_SWITCH_ON_VENT = 450;
+const int PPM_SWITCH_OFF_VENT = 420;
 
 const byte INDEX_ALARM_PNONE = 1;                   //index in phonesEEPROM[5]
 const byte MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES = 3;  //После MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES неудачных попыток (с вводом неверного пароля) за последние 10 мин, блокируем (не берем трубку) звонки с любых неизвестных номеров на 30мин либо до звонка с известного номера (что раньше).
@@ -209,13 +209,13 @@ enum EnModeVent { V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEE
 //enum enInCommand { IN_NO, IN_ROOM_INFO, IN_ROOM_COMMAND, IN_CENTRAL_COMMAND };
 //enum enAlarmType { ALR_NO, ALR_VODA, ALR_DOOR };
 
-float t_inn[5];         //температура внутри, по комнатам
-byte h[5];              //влажность внутри, по комнатам
-int co2[5];             //co2 по комнатам
-float t_set[5];         //желаемая температура по комнатам
-float vent_set[5];      //желаемая вентиляция по комнатам
-boolean nagrevStatus[5];//состояние батарей по комнатам (true/false)
-EnModeVent modeVent[5]; //вентиляция по комнатам
+float t_inn[ROOMS_NUMBER];         //температура внутри, по комнатам
+byte h[ROOMS_NUMBER];              //влажность внутри, по комнатам
+int co2[ROOMS_NUMBER];             //co2 по комнатам
+float t_set[ROOMS_NUMBER];         //желаемая температура по комнатам
+float vent_set[ROOMS_NUMBER];      //желаемая вентиляция по комнатам
+boolean nagrevStatus[ROOMS_NUMBER];//состояние батарей по комнатам (true/false)
+EnModeVent modeVent[ROOMS_NUMBER]; //вентиляция по комнатам
 byte alarmStatus[ROOMS_NUMBER];    //alarm, по комнатам  //0-none, 1-medium, 2-serious
 byte alarmStatusNotification[ROOMS_NUMBER][2];    //alarm, раздать по комнатам:  статус//0-none, 1-medium, 2-serious + номера комнат
 //номера комнат подписчиков и поставщиков Alert bitRead(a, 0)
@@ -1761,7 +1761,15 @@ void RefreshSensorData()
 // V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEED1, V_TO_SPEED2, V_SPEED1, V_SPEED2, V_TO_OFF, V_OFF
 void VentControl()
 {
-  float kT =  (-4 * t_out + 525) / PPM_SWITCH_OFF_VENT;
+  float kT = 1;
+  if (t_out < -22)  //too cold
+    kT = 1.5;
+  else if (t_out < 30)
+    kT = (-4 * t_out + 525) / PPM_SWITCH_OFF_VENT;
+  else  //too hot
+    kT = 1.5;
+
+//y=x^2 +3x+1
 
   //  Serial.print("modeVent");
   //  Serial.println(modeVent[ROOM_BED]);
@@ -1775,17 +1783,17 @@ void VentControl()
       if (ventCorrectionPeriod_ms > VENT_CORRECTION_PERIOD_S * 1000)
       {
         //        Serial.print("V_TO_AUTO co =");
-        //        Serial.println(co2[1]);
-        if (co2[1] > PPM_SWITCH_ON_MAX_VENT * kT)
+        //        Serial.println(co2[ROOM_BED]);
+        if (co2[ROOM_BED] > PPM_SWITCH_ON_MAX_VENT * kT)
           modeVent[ROOM_BED] = V_AUTO_SPEED2;
-        else if (co2[1] > PPM_SWITCH_ON_VENT * kT)
+        else if (co2[ROOM_BED] > PPM_SWITCH_ON_VENT * kT)
           modeVent[ROOM_BED] = V_AUTO_SPEED1;
-        else if (co2[1] <= PPM_SWITCH_OFF_VENT * kT)
+        else if (co2[ROOM_BED] <= PPM_SWITCH_OFF_VENT * kT)
         {
           modeVent[ROOM_BED] = V_AUTO_OFF;
           //          Serial.println("OFF1");
           //          Serial.print("low co2 =");
-          //          Serial.println(co2[1]);
+          //          Serial.println(co2[ROOM_BED]);
         }
         //        Serial.print("modeVent1 =");
         //        Serial.println(modeVent[ROOM_BED]);
@@ -1795,7 +1803,7 @@ void VentControl()
           modeVent[ROOM_BED] = (modeVent[ROOM_BED] == V_AUTO_SPEED2 ? V_AUTO_SPEED1 : V_AUTO_OFF);
           //          Serial.println("OFF2");
           //          Serial.print("low co2 =");
-          //          Serial.println(co2[1]);
+          //          Serial.println(co2[ROOM_BED]);
         }
         //        Serial.print("modeVent2 =");
         //        Serial.println(modeVent[ROOM_BED]);
