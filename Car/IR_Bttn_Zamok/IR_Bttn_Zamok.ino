@@ -149,6 +149,11 @@ void loop()
         setupPart1 = setupPart2;
         setupPart2 = res;
       }
+      if (res == IR_OPEN_CODE)
+      {
+        ZamokOpen();
+        ChangeSetupMode(); //проверим и сразу выйдем из сетапа
+      }
     }
     else //normal mode
     {
@@ -179,7 +184,7 @@ void loop()
     else if (resultBtnCode == BTN_OPEN_CODE)
       ZamokOpen();
     else if (resultBtnCode == BTN_SETUP_CODE)
-      SetupMode();
+      ChangeSetupMode();
     else//wrong code, do pause
     {
       Serial.println("wrong");
@@ -263,7 +268,7 @@ void ZamokOpen()
 }
 
 
-void SetupMode()
+void ChangeSetupMode()
 {
   Serial.println("ZamokClose");
   digitalWrite(CLOSE_PIN, HIGH);
