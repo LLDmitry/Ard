@@ -133,7 +133,7 @@ void loop()
     Serial.println(res);
     if (setupMode)
     {
-      if (res == "38863bda") // && setupPart1 == "" && setupPart2 == "")
+      if (res == "38863bda")// && setupPart1 == "" && setupPart2 == "")
       {
         Serial.println("YES!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         Serial.println(setupPart1);
@@ -148,6 +148,9 @@ void loop()
       {
         setupPart1 = setupPart2;
         setupPart2 = res;
+        digitalWrite(BZZ_PIN, HIGH);
+        _delay_ms(50);
+        digitalWrite(BZZ_PIN, LOW);
       }
       if (res == IR_OPEN_CODE)
       {
@@ -199,13 +202,13 @@ void loop()
   {
     isActiveWork = true;
     prevIgnitionStatus = true;
-    Serial.println("IGNITION ON");
+    //Serial.println("IGNITION ON");
   }
   else
   {
     if (prevIgnitionStatus)
     {
-      Serial.println("IGNITION Off");
+      //Serial.println("IGNITION Off");
       prevIgnitionStatus = false;
       afterSwitchOff_ms = 0;
     }
@@ -270,16 +273,18 @@ void ZamokOpen()
 
 void ChangeSetupMode()
 {
-  Serial.println("ZamokClose");
-  digitalWrite(CLOSE_PIN, HIGH);
-  _delay_ms(IMPULSE_ZAMOK_MS);
-  digitalWrite(CLOSE_PIN, LOW);
   setupMode = !setupMode;
 
   digitalWrite(BZZ_PIN, HIGH);
   if (setupMode)
+  {
+    Serial.println("SetupMode");
     _delay_ms(1000);
+  }
   else
+  {
+    Serial.println("ExitSetupMode");
     _delay_ms(200);
+  }
   digitalWrite(BZZ_PIN, LOW);
 }
