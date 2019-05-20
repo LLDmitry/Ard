@@ -101,7 +101,7 @@ TFT TFTscreen = TFT(TFT_CS, TFT_DC, TFT_RST);
 //const byte ROOM_CHILD_SENSOR = 5;
 //const byte ROOM_VENT = 6;
 //const byte ROOM_HALL = 7;
-const byte ROOM_NUMBER = 2;
+const byte ROOM_NUMBER = 1;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин

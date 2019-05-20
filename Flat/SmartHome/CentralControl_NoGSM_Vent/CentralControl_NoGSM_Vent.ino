@@ -99,7 +99,7 @@ const byte ROOM_HALL = 4;
 //Параметры комфорта
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
 const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;
-const float MAX_COMFORT_ROOM_TEMP = 23.5;
+const float MAX_COMFORT_ROOM_TEMP = 23.0;
 const float BORDER_WINTER_SUMMER = 10; // +10c
 const int PPM_SWITCH_ON_MAX_VENT = 800;
 const int PPM_SWITCH_ON_VENT = 500;
@@ -1748,15 +1748,24 @@ void RefreshSensorData()
 void VentControl()
 {
   float kT = 1;
-  if (t_out < -22)  //too cold
+  if (t_out < -20)  //too cold
     kT = 1.5;
   else if (t_out < 30)
     kT = (-4 * t_out + 525) / PPM_SWITCH_OFF_VENT;
-  else  //too hot
+  else  //too hot, >30
     kT = 1.5;
 
-  //  Serial.print("modeVent");
-  //  Serial.println(modeVent[ROOM_BED]);
+  Serial.print("kT=");
+  Serial.println(kT);
+  Serial.print("modeVent=");
+  Serial.println(modeVent[ROOM_BED]);
+  Serial.print("t_vent=");
+  Serial.println(t_vent);
+  Serial.print("t_inn=");
+  Serial.println(t_inn[ROOM_BED]);
+  Serial.print("co2=");
+  Serial.println(co2[ROOM_BED]);
+
   //for (byte i = 0; i < 5; i++)
   switch (modeVent[ROOM_BED])
   {
@@ -1767,34 +1776,25 @@ void VentControl()
       if (ventCorrectionPeriod_ms > VENT_CORRECTION_PERIOD_S * 1000)
       {
         //        Serial.print("V_TO_AUTO co =");
-        //        Serial.println(co2[1]);
-        if (co2[1] > PPM_SWITCH_ON_MAX_VENT * kT)
+        //        Serial.println(co2[ROOM_BED]);
+        if (co2[ROOM_BED] > PPM_SWITCH_ON_MAX_VENT * kT)
           modeVent[ROOM_BED] = V_AUTO_SPEED2;
-        else if (co2[1] > PPM_SWITCH_ON_VENT * kT)
+        else if (co2[ROOM_BED] > PPM_SWITCH_ON_VENT * kT)
           modeVent[ROOM_BED] = V_AUTO_SPEED1;
-        else if (co2[1] <= PPM_SWITCH_OFF_VENT * kT)
+        else if (co2[ROOM_BED] <= PPM_SWITCH_OFF_VENT * kT)
         {
           modeVent[ROOM_BED] = V_AUTO_OFF;
-          //          Serial.println("OFF1");
-          //          Serial.print("low co2 =");
-          //          Serial.println(co2[1]);
         }
-        //        Serial.print("modeVent1 =");
-        //        Serial.println(modeVent[ROOM_BED]);
+
         //reduce speed or off if too cold in room
-        if (t_inn[1] < (t_out < BORDER_WINTER_SUMMER ? MIN_COMFORT_ROOM_TEMP_WINTER : MIN_COMFORT_ROOM_TEMP_SUMMER) && t_inn[1] > t_vent) //t_inn too cold
+        if (t_inn[ROOM_BED] < (t_out < BORDER_WINTER_SUMMER ? MIN_COMFORT_ROOM_TEMP_WINTER : MIN_COMFORT_ROOM_TEMP_SUMMER) && t_inn[ROOM_BED] > t_vent) //t_inn too cold
         {
           modeVent[ROOM_BED] = (modeVent[ROOM_BED] == V_AUTO_SPEED2 ? V_AUTO_SPEED1 : V_AUTO_OFF);
-          //          Serial.println("OFF2");
-          //          Serial.print("low co2 =");
-          //          Serial.println(co2[1]);
         }
-        if (t_inn[1] > MAX_COMFORT_ROOM_TEMP && t_inn[1] > t_out) //t_inn too hot
+        if (t_inn[ROOM_BED] > MAX_COMFORT_ROOM_TEMP && t_inn[ROOM_BED] > t_out) //t_inn too hot
         {
-          modeVent[ROOM_BED] = (modeVent[ROOM_BED] == V_AUTO_OFF ? V_AUTO_SPEED1 : V_AUTO_SPEED2);         
+          modeVent[ROOM_BED] = (modeVent[ROOM_BED] == V_AUTO_OFF ? V_AUTO_SPEED1 : V_AUTO_SPEED2);
         }
-        //        Serial.print("modeVent2 =");
-        //        Serial.println(modeVent[ROOM_BED]);
         ventCorrectionPeriod_ms = 0;
       }
       break;
@@ -1819,7 +1819,7 @@ void VentControl()
   //  if (!sped1 && !sped2)
   //  {
   //    Serial.print("low co2 =");
-  //    Serial.println(co2[1]);
+  //    Serial.println(co2[ROOM_BED]);
   //  }
 
   digitalWrite(VENT_SPEED1_PIN, sped1);
