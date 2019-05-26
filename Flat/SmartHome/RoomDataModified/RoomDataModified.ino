@@ -483,19 +483,20 @@ void ShowStatistic()
     }
   }
 
+
   switch (Mode)
   {
     case 1: //T inn
-      topVal = maxVal + 5;
-      baseVal = topVal - 30;  //30 = 3c
+      topVal = maxVal > 250 ? 255 : maxVal + 5;
+      baseVal = topVal < 30 ? 0 : topVal - 30; //30 = 3c
       //baseVal = BASE_VAL_T_IN;
       //topVal = TOP_VAL_T_IN;
       colorLine = BLUE;
       break;
     case 2: //T out
-      topVal = maxVal + 4;
+      topVal = maxVal > 251 ? 255 : maxVal + 4;
       //baseVal = topVal - 50; //50 = 13c
-      baseVal = minVal - 4;
+      baseVal = minVal < 4 ? 0 : minVal - 4;
       //        baseVal = BASE_VAL_T_OUT;
       //        topVal = TOP_VAL_T_OUT;
       colorLine = GREEN;
@@ -513,8 +514,8 @@ void ShowStatistic()
     case 5: //P
       //      baseVal = BASE_VAL_P;
       //      topVal = TOP_VAL_P;
-      topVal = maxVal + 3;
-      baseVal = minVal - 3;
+      topVal = maxVal > 252 ? 255 : maxVal + 3;
+      baseVal = minVal < 3 ? 0 : minVal - 3;
       colorLine = CYAN;
       break;
   }
