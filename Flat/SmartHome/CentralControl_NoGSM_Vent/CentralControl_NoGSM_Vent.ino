@@ -49,8 +49,8 @@
 //#define REGISTRATOR_PIN 15// активация регистратора
 //#define ADD_DEVICE_PIN 16 // дополнительное устройство
 
-#define VENT_SPEED1_PIN 8
-#define VENT_SPEED2_PIN 9
+//#define VENT_SPEED1_PIN 8
+//#define VENT_SPEED2_PIN 9
 
 #define DHTTYPE DHT22
 
@@ -95,15 +95,16 @@ const byte ROOM_BED = 1;
 const byte ROOM_VANNA1 = 2;
 const byte ROOM_VANNA2 = 3;
 const byte ROOM_HALL = 4;
+const byte ROOM_VENT = 5;
+const byte ROOM_SENSOR = 6;
 
 //Параметры комфорта
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
 const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;
 const float MAX_COMFORT_ROOM_TEMP = 23.0;
 const float BORDER_WINTER_SUMMER = 10; // +10c
-const int PPM_SWITCH_ON_MAX_VENT = 800;
-const int PPM_SWITCH_ON_VENT = 500;
-const int PPM_SWITCH_OFF_VENT = 470;
+
+const int arCO2Levels[3] = {450, 600, 900};
 
 const byte INDEX_ALARM_PNONE = 1;                   //index in phonesEEPROM[5]
 const byte MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES = 3;  //После MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES неудачных попыток (с вводом неверного пароля) за последние 10 мин, блокируем (не берем трубку) звонки с любых неизвестных номеров на 30мин либо до звонка с известного номера (что раньше).
@@ -148,7 +149,7 @@ String _response = "";              // Переменная для хранен�
 
 //enum EnCallInform { CI_NO_220, CI_ALARM1, CI_ALARM2, CI_VODA1, CI_VODA2 };
 //
-enum EnModeVent { V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEED1, V_TO_SPEED2, V_SPEED1, V_SPEED2, V_TO_OFF, V_OFF };
+enum EnModeVent { V_AUTO_OFF, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_SPEED3, V_TO_AUTO, V_TO_SPEED1, V_TO_SPEED2, V_TO_SPEED3, V_SPEED1, V_SPEED2, V_SPEED3, V_TO_OFF, V_OFF };
 //
 //enum EnMP3Mode {
 //  M_NO, M_ASK_DTMF, M_ASK_PASSWORD, M_RECALL_MODE_CHANGE, M_DTMF_RECOGN, M_DTMF_NO_RECOGN, M_DTMF_INCORRECT_PASSWORD, M_COMMAND_APPROVED,
@@ -307,8 +308,8 @@ void setup()
   //  pinMode(U_220_PIN, INPUT);
   //  pinMode(BTTN_PIN, INPUT_PULLUP);
   pinMode(BZZ_PIN, OUTPUT);
-  pinMode(VENT_SPEED1_PIN, OUTPUT);
-  pinMode(VENT_SPEED2_PIN, OUTPUT);
+  //  pinMode(VENT_SPEED1_PIN, OUTPUT);
+  //  pinMode(VENT_SPEED2_PIN, OUTPUT);
 
   //  pinMode(ADD_DEVICE_PIN, OUTPUT);
   //  pinMode(MIC_PIN, OUTPUT);
@@ -1578,7 +1579,6 @@ void FillAlarmStatuses()
   }
 }
 
-//send Tout
 void SendCommandNRF(byte roomNumber)
 {
   nrfRequest.Command = RQ_T_INFO;
@@ -1586,6 +1586,24 @@ void SendCommandNRF(byte roomNumber)
   nrfRequest.tOut = t_out;
   nrfRequest.p_v = p_v;
   nrfRequest.nagrevStatus = nagrevStatus[roomNumber];
+  if (roomNumber == ROOM_VENT)
+    switch (modeVent[ROOM_BED])
+    {
+      case V_AUTO_SPEED1:
+      case V_SPEED1:
+        nrfRequest.ventSpeed = 1;
+        break;
+      case V_AUTO_SPEED2:
+      case V_SPEED2:
+        nrfRequest.ventSpeed = 2;
+        break;
+      case V_AUTO_SPEED3:
+      case V_SPEED3:
+        nrfRequest.ventSpeed = 3;
+        break;
+      default:
+        nrfRequest.ventSpeed = 0;
+    }
   nrfRequest.hours = hour();
   nrfRequest.minutes = minute();
   nrfRequest.alarmMaxStatus = alarmStatusNotification[roomNumber][0];
@@ -1658,7 +1676,7 @@ void ParseAndHandleInputNrfCommand()
   //
   //    case IN_ROOM_COMMAND:
   //V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEED1, V_TO_SPEED2, V_SPEED1, V_SPEED2, V_TO_OFF, V_OFF
-  switch (nrfResponse.ventSpeed) //0-not supported, 1-1st speed, 2-2nd speed, 10 - off, 100 - auto
+  switch (nrfResponse.ventSpeed) //0-not supported, 1,2,3: 1-3st speed, 10 - off, 100 - auto
   {
     case 10: //off
       if (modeVent[nrfResponse.roomNumber] != V_OFF)
@@ -1672,9 +1690,14 @@ void ParseAndHandleInputNrfCommand()
       if (modeVent[nrfResponse.roomNumber] != V_SPEED2)
         modeVent[nrfResponse.roomNumber] = V_TO_SPEED2;
       break;
+    case 3: //3d speed
+      if (modeVent[nrfResponse.roomNumber] != V_SPEED3)
+        modeVent[nrfResponse.roomNumber] = V_TO_SPEED3;
+      break;
     case 100: //auto
       if (modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED1 &&
           modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED2 &&
+          modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED3 &&
           modeVent[nrfResponse.roomNumber] != V_AUTO_OFF)
       {
         modeVent[nrfResponse.roomNumber] = V_TO_AUTO;
@@ -1751,7 +1774,7 @@ void VentControl()
   if (t_out < -20)  //too cold
     kT = 1.5;
   else if (t_out < 30)
-    kT = (-4 * t_out + 525) / PPM_SWITCH_OFF_VENT;
+    kT = (-4 * t_out + 525) / (float)arCO2Levels[1];
   else  //too hot, >30
     kT = 1.5;
 
@@ -1772,28 +1795,31 @@ void VentControl()
     case V_TO_AUTO:
     case V_AUTO_SPEED1:
     case V_AUTO_SPEED2:
+    case V_AUTO_SPEED3:
     case V_AUTO_OFF:
       if (ventCorrectionPeriod_ms > VENT_CORRECTION_PERIOD_S * 1000)
       {
-        //        Serial.print("V_TO_AUTO co =");
-        //        Serial.println(co2[ROOM_BED]);
-        if (co2[ROOM_BED] > PPM_SWITCH_ON_MAX_VENT * kT)
+        if (co2[ROOM_BED] > arCO2Levels[3] * kT)
+          modeVent[ROOM_BED] = V_AUTO_SPEED3;
+        if (co2[ROOM_BED] > arCO2Levels[2] * kT)
           modeVent[ROOM_BED] = V_AUTO_SPEED2;
-        else if (co2[ROOM_BED] > PPM_SWITCH_ON_VENT * kT)
+        else if (co2[ROOM_BED] > arCO2Levels[1] * kT)
           modeVent[ROOM_BED] = V_AUTO_SPEED1;
-        else if (co2[ROOM_BED] <= PPM_SWITCH_OFF_VENT * kT)
-        {
+        else
           modeVent[ROOM_BED] = V_AUTO_OFF;
-        }
 
         //reduce speed or off if too cold in room
-        if (t_inn[ROOM_BED] < (t_out < BORDER_WINTER_SUMMER ? MIN_COMFORT_ROOM_TEMP_WINTER : MIN_COMFORT_ROOM_TEMP_SUMMER) && t_inn[ROOM_BED] > t_vent) //t_inn too cold
+        if (t_inn[ROOM_BED] < (t_out < BORDER_WINTER_SUMMER ? MIN_COMFORT_ROOM_TEMP_WINTER : MIN_COMFORT_ROOM_TEMP_SUMMER) && t_inn[ROOM_BED] > t_vent)
         {
-          modeVent[ROOM_BED] = (modeVent[ROOM_BED] == V_AUTO_SPEED2 ? V_AUTO_SPEED1 : V_AUTO_OFF);
+          if (modeVent[ROOM_BED] >= V_AUTO_SPEED1 && modeVent[ROOM_BED] <= V_AUTO_SPEED3)
+            modeVent[ROOM_BED] = modeVent[ROOM_BED] - 1;
         }
-        if (t_inn[ROOM_BED] > MAX_COMFORT_ROOM_TEMP && t_inn[ROOM_BED] > t_out) //t_inn too hot
+
+        //increase speed if too hot in room
+        if (t_inn[ROOM_BED] > MAX_COMFORT_ROOM_TEMP && t_inn[ROOM_BED] > t_out)
         {
-          modeVent[ROOM_BED] = (modeVent[ROOM_BED] == V_AUTO_OFF ? V_AUTO_SPEED1 : V_AUTO_SPEED2);
+          if (modeVent[ROOM_BED] >= V_AUTO_OFF && modeVent[ROOM_BED] < V_AUTO_SPEED3)
+            modeVent[ROOM_BED] = modeVent[ROOM_BED] + 1;
         }
         ventCorrectionPeriod_ms = 0;
       }
@@ -1808,22 +1834,10 @@ void VentControl()
     case V_TO_SPEED2:
       modeVent[ROOM_BED] = V_SPEED2;
       break;
+    case V_TO_SPEED3:
+      modeVent[ROOM_BED] = V_SPEED3;
+      break;      
   }
-  bool sped1 = (modeVent[ROOM_BED] == V_SPEED1 || modeVent[ROOM_BED] == V_AUTO_SPEED1);
-  bool sped2 = (modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_AUTO_SPEED2);
-  //  Serial.print("sped1 =");
-  //  Serial.println(sped1);
-  //  Serial.print("sped2 =");
-  //  Serial.println(sped2);
-
-  //  if (!sped1 && !sped2)
-  //  {
-  //    Serial.print("low co2 =");
-  //    Serial.println(co2[ROOM_BED]);
-  //  }
-
-  digitalWrite(VENT_SPEED1_PIN, sped1);
-  digitalWrite(VENT_SPEED2_PIN, sped2);
 }
 
 //void NagrevControl()

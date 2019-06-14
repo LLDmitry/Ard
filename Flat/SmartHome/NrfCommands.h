@@ -20,11 +20,11 @@ typedef struct {
   float tOut;           //4b
   int p_v;              //2b
   boolean nagrevStatus; //1b
+  byte ventSpeed;       //1b
   byte hours;           //1b
   byte minutes;         //1b
   byte alarmMaxStatus;  //1b
   byte alarmRooms;  	//1b
-  byte ventSpeed;
 } NRFRequest;         	//11b
 
 typedef struct {

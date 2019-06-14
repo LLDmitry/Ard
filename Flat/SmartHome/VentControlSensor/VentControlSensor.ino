@@ -38,6 +38,7 @@
 
 #define VENT_SPEED1_PIN 8
 #define VENT_SPEED2_PIN 9
+#define VENT_SPEED3_PIN 16 //A3
 
 #define P1_PIN 5  //до фильтра
 #define P2_PIN 4  //после фильтра
@@ -110,6 +111,7 @@ void setup()
 
   pinMode(VENT_SPEED1_PIN, OUTPUT);
   pinMode(VENT_SPEED2_PIN, OUTPUT);
+  pinMode(VENT_SPEED3_PIN, OUTPUT);
 
   pinMode(P1_PIN, OUTPUT);
   pinMode(P2_PIN, OUTPUT);
@@ -178,6 +180,7 @@ void VentControl()
 {
   digitalWrite(VENT_SPEED1_PIN, nrfRequest.ventSpeed == 1);
   digitalWrite(VENT_SPEED2_PIN, nrfRequest.ventSpeed == 2);
+  digitalWrite(VENT_SPEED3_PIN, nrfRequest.ventSpeed == 3);
 }
 
 //send room data
