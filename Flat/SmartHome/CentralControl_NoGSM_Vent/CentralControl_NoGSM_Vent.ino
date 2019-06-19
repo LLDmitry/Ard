@@ -1660,6 +1660,8 @@ void ParseAndHandleInputNrfCommand()
   alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
   t_inn[nrfResponse.roomNumber] = nrfResponse.tInn;
   co2[nrfResponse.roomNumber] = nrfResponse.co2;
+  if (nrfResponse.roomNumber == ROOM_SENSOR)
+    t_out2 = nrfResponse.tOut;
   //      h[nrfResponse.roomNumber] = nrfResponse.h;
   //      t_set[nrfResponse.roomNumber] = nrfResponse.t_set;
   //
@@ -1752,7 +1754,6 @@ void RefreshSensorData()
     //    //float realTemper = sensors.getTempCByIndex(0);
     //    //t_inn = sensors.getTempC(innerTempDeviceAddress);
     t_out1 = sensors.getTempC(outer1TempDeviceAddress);
-    //    t_out2 = sensors.getTempC(outer2TempDeviceAddress);
     //    t_vent = sensors.getTempC(ventTempDeviceAddress);
     t_vent = t_out1;
     //    t_unit = sensors.getTempC(unitTempDeviceAddress);
@@ -1836,7 +1837,7 @@ void VentControl()
       break;
     case V_TO_SPEED3:
       modeVent[ROOM_BED] = V_SPEED3;
-      break;      
+      break;
   }
 }
 
