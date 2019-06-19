@@ -90,14 +90,6 @@ const unsigned long NAGREV_CONTROL_PERIOD_S = 60;
 const unsigned long AUTO_REFRESH_DISPLAY_PERIOD_S = 10;
 const unsigned long INPUT_COMMAND_DISPLAY_PERIOD_S = 60;
 
-const byte ROOM_GOST = 0;
-const byte ROOM_BED = 1;
-const byte ROOM_VANNA1 = 2;
-const byte ROOM_VANNA2 = 3;
-const byte ROOM_HALL = 4;
-const byte ROOM_VENT = 5;
-const byte ROOM_SENSOR = 6;
-
 //Параметры комфорта
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
 const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;

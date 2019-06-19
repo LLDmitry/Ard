@@ -27,16 +27,7 @@
 #define RNF_MISO      12
 #define RNF_SCK       13
 
-//const byte ROOM_CENTRAL = 0;
-//const byte ROOM_GOST = 1;
-//const byte ROOM_BED = 2;
-//const byte ROOM_VANNA1 = 3;
-//const byte ROOM_VANNA2 = 4;
-//const byte ROOM_CHILD = 5;
-//const byte ROOM_CHILD_SENSOR = 5;
-//const byte ROOM_VENT = 6;
-//const byte ROOM_HALL = 7;
-const byte ROOM_NUMBER = 3;//or 4
+const byte ROOM_NUMBER = ROOM_VANNA1;
 
 const boolean solenoidNormalOpened = true;
 

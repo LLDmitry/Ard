@@ -91,15 +91,7 @@ DHT dht(DHT_PIN, DHTTYPE);
 
 TFT TFTscreen = TFT(TFT_CS, TFT_DC, TFT_RST);
 
-
-//const byte ROOM_GOST = 0;
-//const byte ROOM_BED = 1;
-//const byte ROOM_VANNA1 = 2;
-//const byte ROOM_VANNA2 = 3;
-//const byte ROOM_HALL = 4;
-//const byte ROOM_VENT = 5;
-//const byte ROOM_SENSOR = 6;
-const byte ROOM_NUMBER = 1;
+const byte ROOM_NUMBER = ROOM_BED;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин
