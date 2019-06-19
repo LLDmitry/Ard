@@ -13,6 +13,7 @@ const uint8_t ChannelNRF = 0x60;
 enum enRequestCommand { RQ_NO, RQ_T_INFO, RQ_CLOSE_VODA_1, RQ_CLOSE_VODA_2, RQ_ALARM_SHORT, RQ_ALARM_LONG, RQ_VENT };
 enum enResponseCommand { RSP_NO, RSP_INFO, RSP_COMMAND };
 enum enAlarmType { ALR_NO, ALR_VODA, ALR_DOOR };
+enum enRooms { ROOM_GOST, ROOM_BED, ROOM_VANNA1, ROOM_VANNA2, ROOM_HALL, ROOM_VENT, ROOM_SENSOR};
 
 typedef struct {
   enRequestCommand Command;  //1b
