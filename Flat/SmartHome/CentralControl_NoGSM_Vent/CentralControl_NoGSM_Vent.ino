@@ -49,8 +49,8 @@
 //#define REGISTRATOR_PIN 15// активация регистратора
 //#define ADD_DEVICE_PIN 16 // дополнительное устройство
 
-//#define VENT_SPEED1_PIN 8
-//#define VENT_SPEED2_PIN 9
+#define VENT_SPEED1_PIN 8
+#define VENT_SPEED2_PIN 9
 
 #define DHTTYPE DHT22
 
@@ -300,8 +300,8 @@ void setup()
   //  pinMode(U_220_PIN, INPUT);
   //  pinMode(BTTN_PIN, INPUT_PULLUP);
   pinMode(BZZ_PIN, OUTPUT);
-  //  pinMode(VENT_SPEED1_PIN, OUTPUT);
-  //  pinMode(VENT_SPEED2_PIN, OUTPUT);
+  pinMode(VENT_SPEED1_PIN, OUTPUT);
+  pinMode(VENT_SPEED2_PIN, OUTPUT);
 
   //  pinMode(ADD_DEVICE_PIN, OUTPUT);
   //  pinMode(MIC_PIN, OUTPUT);
@@ -1537,7 +1537,7 @@ void NrfCommunication()
 {
   if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
   {
-    for (byte iRoom = 0; iRoom < 3; iRoom++)
+    for (byte iRoom = 0; iRoom <= 6; iRoom++)
     {
       Serial.print(iRoom);
       Serial.print(" SendCommandNRF ");
@@ -1831,6 +1831,10 @@ void VentControl()
       modeVent[ROOM_BED] = V_SPEED3;
       break;
   }
+
+  digitalWrite(VENT_SPEED1_PIN, modeVent[ROOM_BED] == V_SPEED1);
+  digitalWrite(VENT_SPEED2_PIN, modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_SPEED3);
+
 }
 
 //void NagrevControl()

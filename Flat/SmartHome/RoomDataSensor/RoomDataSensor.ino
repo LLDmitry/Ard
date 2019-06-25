@@ -109,6 +109,7 @@ void setup()
   sensors.setResolution(tempDeviceAddress, 12);
 
   setup_watchdog(WDTO_8S); //approximately 8 sec. of sleep
+  Serial.println("Ready");
 }
 
 void RefreshSensorData()
@@ -131,20 +132,22 @@ bool ReadCommandNRF()
 {
   if (radio.available())
   {
-    Serial.println("radio.available!!");
-    //radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
+    Serial.println("radio.available1");
     while (radio.available()) // While there is data ready
     {
       radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
       delay(20);
-      Serial.println("radio.available: ");
+      Serial.println("radio.available2: ");
       Serial.println(nrfRequest.tOut);
     }
     radio.startListening();   // Now, resume listening so we catch the next packets.
     nrfResponse.Command == RSP_NO;
     //0    nrfResponse.tOut = 99.9;
+    Serial.println("radio.available3");
     return true;
   }
+  else
+    return false;
 }
 
 //send room data
@@ -152,9 +155,7 @@ void PrepareCommandNRF()
 {
   Serial.println("PrepareCommandNRF1");
   nrfResponse.Command = RSP_INFO;
-
   nrfResponse.roomNumber = ROOM_NUMBER;
-
   nrfResponse.tOut = t;
 
   radio.flush_tx();
