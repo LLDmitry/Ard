@@ -249,6 +249,9 @@ void setup()
   pinMode(LED_PIN, OUTPUT);
   pinMode( LGHT_SENSOR_PIN, INPUT);
 
+  Serial.print("ROOM_NUMBER=");
+  Serial.println(ROOM_NUMBER);
+
   wdt_enable(WDTO_8S);
 }
 

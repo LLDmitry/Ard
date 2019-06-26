@@ -55,7 +55,7 @@
 //const byte ROOM_HALL = 4;
 //const byte ROOM_VENT = 5;
 //const byte ROOM_SENSOR = 6;
-const byte ROOM_NUMBER = 6;
+const byte ROOM_NUMBER = ROOM_SENSOR;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;  //2 мин
 
@@ -63,7 +63,7 @@ const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;  //2 мин
 elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 
 
-float t = 0.0f;
+float tOut = 0.0f;
 
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
@@ -119,7 +119,7 @@ void RefreshSensorData()
     Serial.println("RefreshSensorData");
 
     sensors.requestTemperatures();
-    t = sensors.getTempCByIndex(0);
+    tOut = 11.01; // sensors.getTempCByIndex(0);
 
     PrepareCommandNRF();
 
@@ -156,7 +156,7 @@ void PrepareCommandNRF()
   Serial.println("PrepareCommandNRF1");
   nrfResponse.Command = RSP_INFO;
   nrfResponse.roomNumber = ROOM_NUMBER;
-  nrfResponse.tOut = t;
+  nrfResponse.tOut = tOut;
 
   radio.flush_tx();
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
