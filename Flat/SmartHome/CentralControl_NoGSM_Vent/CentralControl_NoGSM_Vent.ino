@@ -1832,8 +1832,8 @@ void VentControl()
       break;
   }
 
-  digitalWrite(VENT_SPEED1_PIN, modeVent[ROOM_BED] == V_SPEED1);
-  digitalWrite(VENT_SPEED2_PIN, modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_SPEED3);
+  digitalWrite(VENT_SPEED1_PIN, modeVent[ROOM_BED] == V_SPEED1 || modeVent[ROOM_BED] == V_AUTO_SPEED1);
+  digitalWrite(VENT_SPEED2_PIN, modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_SPEED3 || modeVent[ROOM_BED] == V_AUTO_SPEED2 || modeVent[ROOM_BED] == V_AUTO_SPEED3);
 
 }
 
