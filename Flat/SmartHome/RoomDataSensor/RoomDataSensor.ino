@@ -55,7 +55,7 @@
 //const byte ROOM_HALL = 4;
 //const byte ROOM_VENT = 5;
 //const byte ROOM_SENSOR = 6;
-const byte ROOM_NUMBER = ROOM_SENSOR;
+const byte ROOM_NUMBER = ROOM_BED;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;  //2 мин
 
@@ -139,11 +139,12 @@ bool ReadCommandNRF()
       delay(20);
       Serial.println("radio.available2: ");
       Serial.println(nrfRequest.tOut);
+      delay(20);
     }
     radio.startListening();   // Now, resume listening so we catch the next packets.
-    nrfResponse.Command == RSP_NO;
-    //0    nrfResponse.tOut = 99.9;
+    //nrfResponse.Command == RSP_NO;
     Serial.println("radio.available3");
+    delay(20);
     return true;
   }
   else
@@ -227,36 +228,36 @@ ISR(WDT_vect)
 void loop()
 {
 
-  if (isActiveWork)
-  {
+//  if (isActiveWork)
+//  {
     RefreshSensorData();
     isActiveWork = !ReadCommandNRF(); //each loop try get command from central control and auto-send nrfResponse
-  }
-  else
-  {
-    radio.powerDown();
-    while (watchdogCounter < 4) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
-    {
-      //all_pins_output();
-      arduino_sleep();
-    }
-
-    //wdt_disable();            //disable & stop wdt timer
-    watchdogCounter = 0;        //reset counter
-
-    radio.powerUp();
-
-    power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
-
-    /*
-      power_adc_enable();         //enable ADC
-      power_timer0_enable();      //enable Timer0
-      power_timer1_enable();      //enable Timer1
-      power_usi_enable();         //enable the Universal Serial Interface module
-    */
-    delay(5);                   //to settle down ADC & peripheries
-    isActiveWork = true;
-
-    //wdt_enable(WDTO_8S);      //enable wdt timer
-  }
+//  }
+//  else
+//  {
+//    radio.powerDown();
+//    while (watchdogCounter < 4) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
+//    {
+//      //all_pins_output();
+//      arduino_sleep();
+//    }
+//
+//    //wdt_disable();            //disable & stop wdt timer
+//    watchdogCounter = 0;        //reset counter
+//
+//    radio.powerUp();
+//
+//    power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
+//
+//    /*
+//      power_adc_enable();         //enable ADC
+//      power_timer0_enable();      //enable Timer0
+//      power_timer1_enable();      //enable Timer1
+//      power_usi_enable();         //enable the Universal Serial Interface module
+//    */
+//    delay(5);                   //to settle down ADC & peripheries
+//    isActiveWork = true;
+//
+//    //wdt_enable(WDTO_8S);      //enable wdt timer
+//  }
 }

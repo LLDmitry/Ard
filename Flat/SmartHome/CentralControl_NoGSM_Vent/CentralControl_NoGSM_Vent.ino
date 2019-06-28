@@ -1538,7 +1538,7 @@ void NrfCommunication()
   if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
   {
     for (byte iRoom = 0; iRoom <= 6; iRoom++)
-    {      
+    {
       Serial.print("SendCommandNRF to ");
       Serial.println(iRoom);
       Serial.println(millis());
@@ -1643,7 +1643,7 @@ void ParseAndHandleInputNrfCommand()
   Serial.println(nrfResponse.roomNumber);
   Serial.print("Alarm= ");
   Serial.println(nrfResponse.alarmType);
-  Serial.print("T= ");
+  Serial.print("Tinn= ");
   Serial.println(nrfResponse.tInn);
   //  Serial.print("CO2= ");
   //  Serial.println(nrfResponse.co2);
@@ -1653,7 +1653,11 @@ void ParseAndHandleInputNrfCommand()
   t_inn[nrfResponse.roomNumber] = nrfResponse.tInn;
   co2[nrfResponse.roomNumber] = nrfResponse.co2;
   if (nrfResponse.roomNumber == ROOM_SENSOR)
+  {
     t_out2 = nrfResponse.tOut;
+    Serial.print("T_r_out= ");
+    Serial.println(nrfResponse.tOut);
+  }
   //      h[nrfResponse.roomNumber] = nrfResponse.h;
   //      t_set[nrfResponse.roomNumber] = nrfResponse.t_set;
   //
@@ -1750,8 +1754,7 @@ void RefreshSensorData()
     t_vent = t_out1;
     //    t_unit = sensors.getTempC(unitTempDeviceAddress);
     //
-    //    t_out = t_out1 < t_out2 ? t_out1 : t_out1;
-    t_out = t_out1;
+    t_out = (t_out2 > 0.0 && t_out2 < t_out1) ? t_out2 : t_out1;
     //    h[ROOM_GOST] = dht.readHumidity();
     //    t_inn[ROOM_GOST] = dht.readTemperature();
     p_v = 0.0075 * bmp.readPressure();

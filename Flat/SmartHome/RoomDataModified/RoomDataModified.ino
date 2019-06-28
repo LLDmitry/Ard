@@ -160,30 +160,6 @@ byte indexStatistic = 0;
 
 String alertedRooms = "";
 
-//typedef struct {
-//  enInCommand Command;  //1b
-//  byte roomNumber; //? или лучше менять address?  1b
-//  float tOut;           //4b
-//  int p_v;              //2b
-//  boolean nagrevStatus; //1b
-//  byte hours;           //1b
-//  byte minutes;         //1b
-//} NRFRequest;         //11b
-//
-//typedef struct {
-//  enOutCommand Command = OUT_NO;                                                              //1
-//  byte roomNumber;  //1,2,3,4                                                                 //2
-//  float t;                                                                                    //4
-//  int co2;                                                                                    //2
-//  byte h;                                                                                     //1
-//  enAlarmType alarmType = ALR_NO;  //voda/door alarm/...                                      //1
-//  byte ventSpeed;   //0-not supported, 1-1st speed, 2-2nd speed, 10 - off, 100 - auto         //1
-//  float t_set = -100;    //желаемая температура (-100 если не задано)                         //4
-//  byte scenarioVent = 99;    //для команды из центрального упр-я 0/1/2/3/99  99 - nothing do  //1
-//  byte scenarioNagrev = 99;  //для команды из центрального упр-я 0/1/2/3/99  99 - nothing do  //1
-//} NRFResponse;  //18b
-
-
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
 
