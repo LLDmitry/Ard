@@ -1520,7 +1520,7 @@ void RadioSetup()
 //}
 
 
-void ReadCommandNRF()
+void ReadCommandNRF() //from reponse
 {
   Serial.println("radio.available!!");
   radio.read(&nrfResponse, sizeof(nrfResponse)); // по адресу переменной nrfResponse функция записывает принятые данные
@@ -1535,10 +1535,11 @@ void ReadCommandNRF()
 
 void NrfCommunication()
 {
+  ResetExternalData();
   if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
   {
     for (byte iRoom = 0; iRoom <= 6; iRoom++)
-    {      
+    {
       Serial.print("SendCommandNRF to ");
       Serial.println(iRoom);
       Serial.println(millis());
@@ -1547,6 +1548,11 @@ void NrfCommunication()
     lastNrfCommunication_ms = 0;
     FillAlarmStatuses();
   }
+}
+
+void ResetExternalData()
+{
+  t_out2 = 99.99;
 }
 
 void FillAlarmStatuses()
