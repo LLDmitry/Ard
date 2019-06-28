@@ -217,7 +217,7 @@ byte arRoomsAlarmNotification[5] = {
 
 
 float t_out1;   //температура снаружи место1
-float t_out2;   //температура снаружи место2
+float t_out2 = 99.99;   //температура снаружи место2
 float t_out;    //температура снаружи (минимальная место1 или место2)
 float t_vent;   //температура внутри вентиляционной системы (в блоке разветвления воздуха) для расчета (t_vent - t_out)
 float t_unit;   //температура блока управления (в самой горячей точке)
@@ -1760,7 +1760,7 @@ void RefreshSensorData()
     t_vent = t_out1;
     //    t_unit = sensors.getTempC(unitTempDeviceAddress);
     //
-    t_out = (t_out2 > 0.0 && t_out2 < t_out1) ? t_out2 : t_out1;
+    t_out = t_out2 < t_out1 ? t_out2 : t_out1;
     //    h[ROOM_GOST] = dht.readHumidity();
     //    t_inn[ROOM_GOST] = dht.readTemperature();
     p_v = 0.0075 * bmp.readPressure();
