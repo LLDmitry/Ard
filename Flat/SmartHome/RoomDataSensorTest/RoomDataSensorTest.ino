@@ -25,17 +25,22 @@
 #include <elapsedMillis.h>
 #include <SPI.h>                 // Подключаем библиотеку SPI
 #include <Wire.h>
-#include <EEPROM.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 #include <RF24.h>
 #include <RF24_config.h>
 #include <stdio.h> // for function sprintf
-#include <IRremote.h>
-#include <avr/sleep.h>
-#include <avr/wdt.h>
+
+//#include <avr/sleep.h>
+//#include <avr/wdt.h>
+//#include <util/delay.h>
+
+#include <avr/sleep.h>     //AVR MCU power management
+#include <avr/power.h>     //disable/anable AVR MCU peripheries (Analog Comparator, ADC, USI, Timers/Counters)
+#include <avr/wdt.h>       //AVR MCU watchdog timer
+#include <avr/io.h>        //includes the apropriate AVR MCU IO definitions
+#include <avr/interrupt.h> //manipulation of the interrupt flags
 #include <util/delay.h>
-//
-//#define CO2_TX        A0
-//#define CO2_RX        A1
 
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
@@ -44,12 +49,10 @@
 #define RNF_MOSI      11  //SDA
 #define RNF_MISO      12
 #define RNF_SCK       13
-//
-//#define TFT_CS        10                  // Указываем пины cs
-//#define TFT_DC        9                   // Указываем пины dc (A0)
-//#define TFT_RST       8                   // Указываем пины reset
 
-const byte ROOM_NUMBER = 6;//ROOM_BED;
+#define ONE_WIRE_PIN 5       // DS18b20
+
+const byte ROOM_NUMBER = ROOM_SENSOR;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 
@@ -58,10 +61,17 @@ elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
 
-//SoftwareSerial mySerial(CO2_TX, CO2_RX); // TX, RX сенсора
+volatile byte watchdogCounter;
+volatile bool isActiveWork = true;
+
+float tOut = 0.0f;
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
+
+OneWire ds(ONE_WIRE_PIN);
+DallasTemperature sensors(&ds);
+DeviceAddress tempDeviceAddress;
 
 void setup()
 {
@@ -71,7 +81,7 @@ void setup()
 
   // RF24
   radio.begin();                          // Включение модуля;
-  delay(2);
+  _delay_ms(2);
   radio.enableAckPayload();                     // Allow optional ack payloads
   //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
 
@@ -87,23 +97,25 @@ void setup()
 
   radio.printDetails();
 
-  Serial.print("ROOM_NUMBER=");
+  sensors.begin();
+  sensors.getAddress(tempDeviceAddress, 0);
+  sensors.setResolution(tempDeviceAddress, 12);
+
+  Serial.print("rOOM_NUMBER=");
   Serial.println(ROOM_NUMBER);
+  _delay_ms(10);
 
   wdt_enable(WDTO_8S);
 }
 
 void RefreshSensorData()
 {
-  byte cmd[9] = { 0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79 };
-  //char response[9];
-  unsigned char response[9];
-
-  // Reading temperature or humidity takes about 250 milliseconds!
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   if (refreshSensors_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
   {
     Serial.println("RefreshSensorData");
+    sensors.requestTemperatures();
+    tOut = 11.01; // sensors.getTempCByIndex(0);
+
     PrepareCommandNRF(RSP_INFO, 100, -100, 99, 99);
     refreshSensors_ms = 0;
   }
@@ -111,7 +123,7 @@ void RefreshSensorData()
 
 
 //Get T out, Pressure and Command
-void ReadCommandNRF()
+bool ReadCommandNRF()
 {
   if (radio.available())
   {
@@ -120,14 +132,17 @@ void ReadCommandNRF()
     while (radio.available()) // While there is data ready
     {
       radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
-      delay(20);
+      _delay_ms(20);
       Serial.println("radio.available: ");
       Serial.println(nrfRequest.tOut);
     }
     radio.startListening();   // Now, resume listening so we catch the next packets.
     nrfResponse.Command == RSP_NO;
     nrfResponse.ventSpeed = 0;
+    return true;
   }
+  else
+    return false;
 }
 
 void HandleInputNrfCommand()
@@ -139,6 +154,7 @@ void HandleInputNrfCommand()
 void PrepareCommandNRF(byte command, byte ventSpeed, float t_set, byte scenarioVent, byte scenarioNagrev)
 {
   Serial.println("PrepareCommandNRF1");
+  _delay_ms(10);
   if (nrfResponse.Command == RSP_NO || command == RSP_COMMAND) //не ставить RSP_INFO пока не ушло RSP_COMMAND
   {
     nrfResponse.Command = command;
@@ -150,10 +166,106 @@ void PrepareCommandNRF(byte command, byte ventSpeed, float t_set, byte scenarioV
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
 }
 
+void GoSleep()
+{
+  wdt_reset();
+  cli();                               //disable interrupts for time critical operations below
+
+  power_all_disable();                 //disable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
+  /*
+    power_adc_disable();                 //disable ADC
+    power_timer0_disable();              //disable Timer0
+    power_timer1_disable();              //disable Timer2
+    power_usi_disable();                 //disable the Universal Serial Interface module
+  */
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN); //set sleep type
+
+#if defined(BODS) && defined(BODSE)  //if MCU has bulit-in BOD it will be disabled, ATmega328P, ATtiny85, AVR_ATtiny45, ATtiny25  
+  sleep_bod_disable();                 //disable Brown Out Detector (BOD) before going to sleep, saves more power
+#endif
+
+  sei();                               //re-enable interrupts
+
+  sleep_mode();                        /*
+                                         system stops & sleeps here, it automatically sets Sleep Enable (SE) bit,
+                                         so sleep is possible, goes to sleep, wakes-up from sleep after interrupt,
+                                         if interrupt is enabled or WDT enabled & timed out, than clears the SE bit.
+*/
+
+  /*** NOTE: sketch will continue from this point after sleep ***/
+}
+
+//void setup_watchdog(byte sleep_time)
+//{
+//  cli();                           //disable interrupts for time critical operations below
+//
+//  wdt_enable(sleep_time);          //set WDCE, WDE change prescaler bits
+//
+//  MCUSR &= ~_BV(WDRF);             //must be cleared first, to clear WDE
+//
+//#if defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny87__) || defined(__AVR_ATtiny167__)
+//  WDTCR  |= _BV(WDCE) & ~_BV(WDE); //set WDCE first, clear WDE second, changes have to be done within 4-cycles
+//  WDTCR  |= _BV(WDIE);             //set WDIE to Watchdog Interrupt
+//#else
+//  WDTCSR |= _BV(WDCE) & ~_BV(WDE); //set WDCE first, clear WDE second, changes have to be done within 4-cycles
+//  WDTCSR |= _BV(WDIE);             //set WDIE to Watchdog Interrupt
+//#endif
+//
+//  sei();                           //re-enable interrupts
+//}
+
+/**************************************************************************/
+/*
+    ISR(WDT_vect)
+    Watchdog Interrupt Service Routine, executed when watchdog is timed out
+    NOTE:
+    - if WDT ISR is not defined, MCU will reset after WDT
+*/
+/**************************************************************************/
+ISR(WDT_vect)
+{
+  watchdogCounter++;
+  Serial.println("watchdogCounter++");
+  _delay_ms(10);
+}
+
 void loop()
 {
-  ReadCommandNRF(); //each loop try read t_out and other info from central control
-  HandleInputNrfCommand();
-  RefreshSensorData();
+  if (isActiveWork)
+  {
+    RefreshSensorData();
+    isActiveWork = ReadCommandNRF(); //each loop try get command from central control and auto-send nrfResponse
+    Serial.print("isActiveWork = ");
+    Serial.println(isActiveWork);
+    _delay_ms(20);
+  }
+  else
+  {
+    Serial.println("GO SLEEP");
+    _delay_ms(20);
+    radio.powerDown();
+    while (watchdogCounter < 4) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
+    {
+      //all_pins_output();
+      GoSleep();
+    }
+
+    // wdt_disable();            //disable & stop wdt timer
+    watchdogCounter = 0;        //reset counter
+
+    radio.powerUp();
+
+    power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
+
+    /*
+      power_adc_enable();         //enable ADC
+      power_timer0_enable();      //enable Timer0
+      power_timer1_enable();      //enable Timer1
+      power_usi_enable();         //enable the Universal Serial Interface module
+    */
+    _delay_ms(5);                   //to settle down ADC & peripheries
+    isActiveWork = true;
+    // wdt_enable(WDTO_8S);      //enable wdt timer
+  }
   wdt_reset();
 }
