@@ -33,8 +33,8 @@
 
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
-#define RNF_CE_PIN    6
-#define RNF_CSN_PIN   7
+#define RNF_CE_PIN    10  //6
+#define RNF_CSN_PIN   9   //7
 #define RNF_MOSI      11  //SDA
 #define RNF_MISO      12
 #define RNF_SCK       13
@@ -220,36 +220,38 @@ ISR(WDT_vect)
 void loop()
 {
 
-//  if (isActiveWork)
-//  {
-    RefreshSensorData();
-    isActiveWork = !ReadCommandNRF(); //each loop try get command from central control and auto-send nrfResponse
-//  }
-//  else
-//  {
-//    radio.powerDown();
-//    while (watchdogCounter < 4) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
-//    {
-//      //all_pins_output();
-//      arduino_sleep();
-//    }
-//
-//    //wdt_disable();            //disable & stop wdt timer
-//    watchdogCounter = 0;        //reset counter
-//
-//    radio.powerUp();
-//
-//    power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
-//
-//    /*
-//      power_adc_enable();         //enable ADC
-//      power_timer0_enable();      //enable Timer0
-//      power_timer1_enable();      //enable Timer1
-//      power_usi_enable();         //enable the Universal Serial Interface module
-//    */
-//    delay(5);                   //to settle down ADC & peripheries
-//    isActiveWork = true;
-//
-//    //wdt_enable(WDTO_8S);      //enable wdt timer
-//  }
+    if (isActiveWork)
+    {
+  RefreshSensorData();
+  isActiveWork = !ReadCommandNRF(); //each loop try get command from central control and auto-send nrfResponse
+    }
+    else
+    {
+      radio.powerDown();
+      while (watchdogCounter < 4) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
+      {
+        //all_pins_output();
+        wdt_reset();
+        arduino_sleep();
+      }
+  
+      //wdt_disable();            //disable & stop wdt timer
+      watchdogCounter = 0;        //reset counter
+  
+      radio.powerUp();
+  
+      power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
+  
+      /*
+        power_adc_enable();         //enable ADC
+        power_timer0_enable();      //enable Timer0
+        power_timer1_enable();      //enable Timer1
+        power_usi_enable();         //enable the Universal Serial Interface module
+      */
+      delay(5);                   //to settle down ADC & peripheries
+      isActiveWork = true;
+  
+      //wdt_enable(WDTO_8S);      //enable wdt timer
+    }
+  wdt_reset();
 }

@@ -89,6 +89,7 @@ const unsigned long VENT_CORRECTION_PERIOD_S = 30; //5min
 const unsigned long NAGREV_CONTROL_PERIOD_S = 60;
 const unsigned long AUTO_REFRESH_DISPLAY_PERIOD_S = 10;
 const unsigned long INPUT_COMMAND_DISPLAY_PERIOD_S = 60;
+const unsigned long GET_EXTERNAL_DATA_INTERVAL_S = 600;
 
 //Параметры комфорта
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
@@ -239,6 +240,7 @@ elapsedMillis nagrevControlPeriod_ms;
 elapsedMillis displayData_ms = AUTO_REFRESH_DISPLAY_PERIOD_S * 1000;
 elapsedMillis outCallStarted_ms;
 elapsedMillis outToneStartedDisconnect_ms;
+elapsedMillis lastGetExternalData_ms = GET_EXTERNAL_DATA_INTERVAL_S * 1000;;
 
 OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
@@ -1522,15 +1524,19 @@ void RadioSetup()
 
 void ReadCommandNRF() //from reponse
 {
-  Serial.println("radio.available!!");
-  radio.read(&nrfResponse, sizeof(nrfResponse)); // по адресу переменной nrfResponse функция записывает принятые данные
-  _delay_ms(20);
-  radio.stopListening();
-  //  Serial.print("received: ");
-  //  Serial.println(sizeof(nrfResponse));
-  //  Serial.println(nrfResponse.co2);
-
-  ParseAndHandleInputNrfCommand();
+  if (radio.available())
+  {
+    Serial.println("radio.available!!");
+    while (radio.available()) // While there is data ready
+    {
+      radio.read(&nrfResponse, sizeof(nrfResponse)); // по адресу переменной nrfResponse функция записывает принятые данные
+      _delay_ms(20);
+      //radio.stopListening();
+      Serial.print("received data from room: ");
+      Serial.println(nrfResponse.roomNumber);
+    }
+    ParseAndHandleInputNrfCommand();
+  }
 }
 
 void NrfCommunication()
@@ -1538,13 +1544,16 @@ void NrfCommunication()
   ResetExternalData();
   if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
   {
+    ReadCommandNRF();
+    radio.stopListening();
     for (byte iRoom = 0; iRoom <= 6; iRoom++)
     {
-      Serial.print("SendCommandNRF to ");
-      Serial.println(iRoom);
-      Serial.println(millis());
+      //      Serial.print("SendCommandNRF to ");
+      //      Serial.println(iRoom);
       SendCommandNRF(iRoom);
     }
+    radio.startListening();
+    radio.openWritingPipe(ArRoomsReadingPipes[ROOM_SENSOR]); //for confirm writes
     lastNrfCommunication_ms = 0;
     FillAlarmStatuses();
   }
@@ -1552,7 +1561,10 @@ void NrfCommunication()
 
 void ResetExternalData()
 {
-  t_out2 = 99.99;
+  if (lastGetExternalData_ms > GET_EXTERNAL_DATA_INTERVAL_S * 1000)
+  {
+    t_out2 = 88.99;
+  }
 }
 
 void FillAlarmStatuses()
@@ -1577,7 +1589,7 @@ void FillAlarmStatuses()
   }
 }
 
-void SendCommandNRF(byte roomNumber)
+void PrepareRequestCommand(byte roomNumber)
 {
   nrfRequest.Command = RQ_T_INFO;
   nrfRequest.roomNumber = roomNumber;
@@ -1609,12 +1621,15 @@ void SendCommandNRF(byte roomNumber)
   //  Serial.println("time:");
   //  Serial.println(hour());
   //  Serial.println(minute());
+}
+void SendCommandNRF(byte roomNumber)
+{
+  PrepareRequestCommand(roomNumber);
 
   Serial.print("roomNumber: ");
   Serial.println(roomNumber);
-  Serial.print("SendNRF: ");
-  Serial.println(sizeof(nrfRequest));
-  radio.stopListening();
+  //Serial.print("SendNRF: ");
+  //Serial.println(sizeof(nrfRequest));
   //  radio.setChannel(arChannelsNRF[roomNumber]);            // Установка канала вещания;
   radio.openWritingPipe(ArRoomsReadingPipes[roomNumber]);
   if (radio.write(&nrfRequest, sizeof(nrfRequest)))
@@ -1636,7 +1651,6 @@ void SendCommandNRF(byte roomNumber)
   {
     Serial.println("Failed Send");
   }
-  //radio.startListening();
 }
 
 void ParseAndHandleInputNrfCommand()
@@ -1658,10 +1672,18 @@ void ParseAndHandleInputNrfCommand()
   alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
   t_inn[nrfResponse.roomNumber] = nrfResponse.tInn;
   co2[nrfResponse.roomNumber] = nrfResponse.co2;
+
+  if (nrfResponse.roomNumber == ROOM_BED)
+  {
+    Serial.print("              CO2= ");
+    Serial.println(nrfResponse.co2);
+  }
+
   if (nrfResponse.roomNumber == ROOM_SENSOR)
   {
     t_out2 = nrfResponse.tOut;
-    Serial.print("T_r_out= ");
+    lastGetExternalData_ms = 0;
+    Serial.print("              T_r_out= ");
     Serial.println(nrfResponse.tOut);
   }
   //      h[nrfResponse.roomNumber] = nrfResponse.h;
@@ -1780,16 +1802,16 @@ void VentControl()
   else  //too hot, >30
     kT = 1.5;
 
-  Serial.print("kT=");
-  Serial.println(kT);
-  Serial.print("modeVent=");
-  Serial.println(modeVent[ROOM_BED]);
-  Serial.print("t_vent=");
-  Serial.println(t_vent);
-  Serial.print("t_inn=");
-  Serial.println(t_inn[ROOM_BED]);
-  Serial.print("co2=");
-  Serial.println(co2[ROOM_BED]);
+  //  Serial.print("kT=");
+  //  Serial.println(kT);
+  //  Serial.print("modeVent=");
+  //  Serial.println(modeVent[ROOM_BED]);
+  //  Serial.print("t_vent=");
+  //  Serial.println(t_vent);
+  //  Serial.print("t_inn=");
+  //  Serial.println(t_inn[ROOM_BED]);
+  //  Serial.print("co2=");
+  //  Serial.println(co2[ROOM_BED]);
 
   //for (byte i = 0; i < 5; i++)
   switch (modeVent[ROOM_BED])
@@ -1892,7 +1914,8 @@ void loop()
   //  WorkflowMain(0);
   //
   RefreshSensorData();
-  NrfCommunication();
+  NrfCommunication(); //read / send / read response
+
   //  CheckAlarmLine();
 
   //();
