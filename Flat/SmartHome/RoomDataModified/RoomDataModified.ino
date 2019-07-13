@@ -203,7 +203,7 @@ void setup()
 
   // RF24
   radio.begin();                          // Включение модуля;
-  delay(2);
+  _delay_ms(10);
   radio.enableAckPayload();                     // Allow optional ack payloads
   //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
 
@@ -227,9 +227,12 @@ void setup()
 
   Serial.print("ROOM_NUMBER=");
   Serial.println(ROOM_NUMBER);
+  _delay_ms(10);
 
   wdt_enable(WDTO_8S);
 }
+
+void(* resetFunc) (void) = 0; // объявляем функцию reset с адресом 0
 
 //void AutoChangeShowMode()
 //{
@@ -284,6 +287,13 @@ void RefreshSensorData()
       ppm_v = (256 * responseHigh) + responseLow;
       Serial.print("co2= ");
       Serial.println(ppm_v);
+    }
+
+    if (ppm_v==0)
+    {
+      Serial.println("RESET");
+      _delay_ms(50);
+      resetFunc(); //вызов reset
     }
 
     PrepareCommandNRF(RSP_INFO, 100, -100, 99, 99);
@@ -695,7 +705,7 @@ void ReadCommandNRF()
     while (radio.available()) // While there is data ready
     {
       radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
-      delay(20);
+      _delay_ms(20);
       Serial.println("radio.available: ");
       Serial.println(nrfRequest.tOut);
     }

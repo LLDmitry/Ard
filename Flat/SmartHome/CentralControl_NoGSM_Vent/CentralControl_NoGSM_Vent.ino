@@ -1544,16 +1544,14 @@ void NrfCommunication()
   ResetExternalData();
   if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
   {
+    radio.openWritingPipe(ArRoomsReadingPipes[ROOM_SENSOR]); //for confirm writes
     ReadCommandNRF();
     radio.stopListening();
     for (byte iRoom = 0; iRoom <= 6; iRoom++)
     {
-      //      Serial.print("SendCommandNRF to ");
-      //      Serial.println(iRoom);
       SendCommandNRF(iRoom);
     }
     radio.startListening();
-    radio.openWritingPipe(ArRoomsReadingPipes[ROOM_SENSOR]); //for confirm writes
     lastNrfCommunication_ms = 0;
     FillAlarmStatuses();
   }
@@ -1562,9 +1560,7 @@ void NrfCommunication()
 void ResetExternalData()
 {
   if (lastGetExternalData_ms > GET_EXTERNAL_DATA_INTERVAL_S * 1000)
-  {
     t_out2 = 88.99;
-  }
 }
 
 void FillAlarmStatuses()
@@ -1628,19 +1624,13 @@ void SendCommandNRF(byte roomNumber)
 
   Serial.print("roomNumber: ");
   Serial.println(roomNumber);
-  //Serial.print("SendNRF: ");
-  //Serial.println(sizeof(nrfRequest));
-  //  radio.setChannel(arChannelsNRF[roomNumber]);            // Установка канала вещания;
   radio.openWritingPipe(ArRoomsReadingPipes[roomNumber]);
   if (radio.write(&nrfRequest, sizeof(nrfRequest)))
   {
     Serial.println("Success Send");
-    delay(10);
-    //lastSend_ms = 0;
+    _delay_ms(10);
     if (!radio.isAckPayloadAvailable() )   // Ждем получения..
-    {
       Serial.println(F("Empty response."));
-    }
     else
     {
       Serial.println(F("RESPONSE!!!."));
@@ -1648,27 +1638,16 @@ void SendCommandNRF(byte roomNumber)
     }
   }
   else
-  {
     Serial.println("Failed Send");
-  }
 }
 
 void ParseAndHandleInputNrfCommand()
 {
   nrfCommandProcessing = true;
-  //  switch (nrfResponse.Command) //IN_NO, IN_ROOM_INFO, IN_ROOM_COMMAND, IN_CENTRAL_COMMAND
-  //  {
-  //    case IN_ROOM_INFO:
   Serial.print("roomNumber= ");
   Serial.println(nrfResponse.roomNumber);
-  Serial.print("Alarm= ");
-  Serial.println(nrfResponse.alarmType);
   Serial.print("Tinn= ");
   Serial.println(nrfResponse.tInn);
-  //  Serial.print("CO2= ");
-  //  Serial.println(nrfResponse.co2);
-  //  Serial.print("vent speed= ");
-  //  Serial.println(nrfResponse.ventSpeed);
   alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
   t_inn[nrfResponse.roomNumber] = nrfResponse.tInn;
   co2[nrfResponse.roomNumber] = nrfResponse.co2;
@@ -1782,7 +1761,10 @@ void RefreshSensorData()
     t_vent = t_out1;
     //    t_unit = sensors.getTempC(unitTempDeviceAddress);
     //
-    t_out = t_out2 < t_out1 ? t_out2 : t_out1;
+    t_out = t_out2 < t_out1 || t_out1 < -100 ? t_out2 : t_out1;
+    Serial.print("t_out= ");
+    Serial.println(t_out);
+
     //    h[ROOM_GOST] = dht.readHumidity();
     //    t_inn[ROOM_GOST] = dht.readTemperature();
     p_v = 0.0075 * bmp.readPressure();

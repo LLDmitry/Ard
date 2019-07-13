@@ -54,9 +54,8 @@
 
 const byte ROOM_NUMBER = ROOM_SENSOR;
 
-const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
-
-elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
+const uint32_t REFRESH_SENSOR_INTERVAL_S = 30;  //1 мин
+const byte calcNumberSleeps8s = round(REFRESH_SENSOR_INTERVAL_S / 8);
 
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
@@ -65,6 +64,7 @@ volatile byte watchdogCounter;
 volatile byte old_ADCSRA;
 
 float tOut = 0.0f;
+bool doubleFaileSend = false;
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
@@ -73,28 +73,23 @@ OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
 DeviceAddress tempDeviceAddress;
 
+
 void setup()
 {
   Serial.begin(9600);
 
-  //  mySerial.begin(9600);
-
   // RF24
   radio.begin();                          // Включение модуля;
   _delay_ms(2);
-  //radio.enableAckPayload();                     // Allow optional ack payloads
-  //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
-
-  // radio.setPayloadSize(32); //18
+  radio.enableAckPayload();                     // Allow optional ack payloads
+  radio.setPayloadSize(32); //18
   radio.setChannel(ChannelNRF);            // Установка канала вещания;
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
-  //radio.setAutoAck(0);                    // Установка режима подтверждения приема;
   radio.openWritingPipe(CentralReadingPipe);     // Активация данных для отправки
   radio.openReadingPipe(1, ArRoomsReadingPipes[ROOM_NUMBER]);   // Активация данных для чтения
   radio.stopListening();
-
   radio.printDetails();
 
   sensors.begin();
@@ -105,26 +100,24 @@ void setup()
   Serial.println(ROOM_NUMBER);
   _delay_ms(10);
 
+  doubleFaileSend = false;
   wdt_enable(WDTO_8S);
 }
 
+void(* resetFunc) (void) = 0; // объявляем функцию reset с адресом 0
+
 void RefreshSensorData()
 {
-  if (refreshSensors_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
-  {
-    Serial.println("RefreshSensorData");
-    sensors.requestTemperatures();
-    tOut = 11.01; // sensors.getTempCByIndex(0);
-    refreshSensors_ms = 0;
-  }
+  Serial.println("RefreshSensorData");
+  sensors.requestTemperatures();
+  tOut = sensors.getTempCByIndex(0); // 11.01 + random(1, 10)
+  Serial.print("tOut=");
+  Serial.println(tOut);
 }
 
 //send room data
 void PrepareCommandNRF()
 {
-  Serial.println("PrepareCommandNRF1");
-  _delay_ms(10);
-
   //  nrfResponse.Command = command;
   nrfResponse.roomNumber = ROOM_NUMBER;
   nrfResponse.tOut = tOut;
@@ -139,13 +132,21 @@ void SendCommandNRF()
   if (radio.write(&nrfResponse, sizeof(nrfResponse)))
   {
     Serial.println("Success Send");
-    delay(10);
+    doubleFaileSend = false;
+    _delay_ms(10);
   }
   else
   {
     Serial.println("Failed Send");
+    if (doubleFaileSend)
+    {
+      Serial.println("RESET");
+      _delay_ms(10);
+      resetFunc(); //вызов reset
+    }
+    else
+      doubleFaileSend = true;
   }
-  //radio.startListening();
 }
 
 //void GoSleep()
@@ -207,7 +208,7 @@ void SendCommandNRF()
 // watchdog interrupt
 ISR(WDT_vect)
 {
-  //  wdt_disable();  // disable watchdog
+  //wdt_disable();  // disable watchdog
   watchdogCounter++;
   Serial.println("watchdogCounter++");
   _delay_ms(50);
@@ -253,15 +254,19 @@ void GoSleep()
 
 void loop()
 {
+  //each wake up get T and send info to central control
   RefreshSensorData();
-  SendCommandNRF(); //each wake up send command to central control
+  SendCommandNRF();
   _delay_ms(50);
+
   Serial.println("GO SLEEP");
   _delay_ms(50);
-  //radio.powerDown();
-  while (watchdogCounter < 1) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
+  radio.powerDown();
+  while (watchdogCounter < calcNumberSleeps8s) //wait for watchdog counter reached the limit, WDTO_8S * 4 = 32sec.
   {
     //all_pins_output();
+    Serial.println("GO SLEEP step");
+    _delay_ms(50);
     GoSleep();  //8 sec sleep
     wdt_reset();
   }
@@ -271,7 +276,7 @@ void loop()
   // wdt_disable();            //disable & stop wdt timer
   watchdogCounter = 0;        //reset counter
 
-  //radio.powerUp();
+  radio.powerUp();
 
   power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
   _delay_ms(100);
