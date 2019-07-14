@@ -1760,8 +1760,7 @@ void RefreshSensorData()
     //    t_vent = sensors.getTempC(ventTempDeviceAddress);
     t_vent = t_out1;
     //    t_unit = sensors.getTempC(unitTempDeviceAddress);
-    //
-    t_out = t_out2 < t_out1 || t_out1 < -100 ? t_out2 : t_out1;
+    t_out = (t_out2 < t_out1 || t_out1 < -100) && t_out2 > -100 ? t_out2 : t_out1;
     Serial.print("t_out= ");
     Serial.println(t_out);
 

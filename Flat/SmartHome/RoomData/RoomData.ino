@@ -205,17 +205,18 @@ void setup()
   radio.begin();                          // Включение модуля;
   _delay_ms(10);
   radio.enableAckPayload();                     // Allow optional ack payloads
+  //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
 
   radio.setPayloadSize(32); //18
   radio.setChannel(ChannelNRF);            // Установка канала вещания;
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
+  //radio.setAutoAck(0);                    // Установка режима подтверждения приема;
   radio.openWritingPipe(CentralReadingPipe);     // Активация данных для отправки
   radio.openReadingPipe(1, ArRoomsReadingPipes[ROOM_NUMBER]);   // Активация данных для чтения
   radio.startListening();
-//  radio.flush_tx();
-//  radio.flush_rx();
+
   radio.printDetails();
 
   irrecv.enableIRIn(); // Start the ir receiver
@@ -288,7 +289,7 @@ void RefreshSensorData()
       Serial.println(ppm_v);
     }
 
-    if (ppm_v == 0)
+    if (ppm_v==0)
     {
       Serial.println("RESET in 3 sec");
       _delay_ms(3000);
@@ -699,16 +700,13 @@ void ReadCommandNRF()
 {
   if (radio.available())
   {
-    int c = 0;
-    Serial.println("//radio.available!!");
+    Serial.println("radio.available!!");
+    //radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
     while (radio.available()) // While there is data ready
     {
-      c++;
-      if (c > 100)
-        digitalWrite(BZZ_PIN, HIGH);
       radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
       _delay_ms(20);
-      Serial.println("//radio.available: ");
+      Serial.println("radio.available: ");
       Serial.println(nrfRequest.tOut);
     }
     radio.startListening();   // Now, resume listening so we catch the next packets.
