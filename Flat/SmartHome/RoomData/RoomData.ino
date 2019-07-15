@@ -23,9 +23,10 @@
 #include "SoftwareSerial.h"
 #include "DHT.h"
 #include <elapsedMillis.h>
-#include <SPI.h>                 // Подключаем библиотеку SPI
+//#include <SPI.h>                 // Подключаем библиотеку SPI
 #include <Wire.h>
 #include <EEPROM.h>
+#include "nRF24L01.h"
 #include <RF24.h>
 #include <RF24_config.h>
 #include <stdio.h> // for function sprintf
@@ -289,7 +290,7 @@ void RefreshSensorData()
       Serial.println(ppm_v);
     }
 
-    if (ppm_v==0)
+    if (ppm_v == 0)
     {
       Serial.println("RESET in 3 sec");
       _delay_ms(3000);
@@ -698,21 +699,37 @@ void ReadFromEEPROM(byte nMode)
 //Get T out, Pressure and Command
 void ReadCommandNRF()
 {
-  if (radio.available())
+
+  bool done = false;
+  if ( radio.available() )
   {
     Serial.println("radio.available!!");
-    //radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
-    while (radio.available()) // While there is data ready
-    {
-      radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
+    while (!done) {                            // Упираемся и
+      done = radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
       _delay_ms(20);
       Serial.println("radio.available: ");
       Serial.println(nrfRequest.tOut);
     }
-    radio.startListening();   // Now, resume listening so we catch the next packets.
+    //radio.startListening();   // Now, resume listening so we catch the next packets.
     nrfResponse.Command == RSP_NO;
     nrfResponse.ventSpeed = 0;
   }
+
+  //  if (radio.available())
+  //  {
+  //    Serial.println("radio.available!!");
+  //    //radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
+  //    while (radio.available()) // While there is data ready
+  //    {
+  //      radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
+  //      _delay_ms(20);
+  //      Serial.println("radio.available: ");
+  //      Serial.println(nrfRequest.tOut);
+  //    }
+  //    radio.startListening();   // Now, resume listening so we catch the next packets.
+  //    nrfResponse.Command == RSP_NO;
+  //    nrfResponse.ventSpeed = 0;
+  //  }
 }
 
 void HandleInputNrfCommand()
@@ -758,7 +775,7 @@ void PrepareCommandNRF(byte command, byte ventSpeed, float t_set, byte scenarioV
   nrfResponse.co2 = ppm_v;
   nrfResponse.h = h_v;
 
-  radio.flush_tx();
+  //radio.flush_tx();
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
 }
 
