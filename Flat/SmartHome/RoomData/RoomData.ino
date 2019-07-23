@@ -98,6 +98,7 @@ const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин
 const uint32_t CHANGE_STATISTIC_INTERVAL_S = 3;
 const uint32_t SET_LED_INTERVAL_S = 5;
+const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
 
 const byte NUMBER_STATISTICS = 60;
 
@@ -145,6 +146,7 @@ elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 elapsedMillis saveStatistic_ms = (SAVE_STATISTIC_INTERVAL_S - REFRESH_SENSOR_INTERVAL_S * 3) * 1000;
 elapsedMillis changeStatistic_ms = 0;
 elapsedMillis setLed_ms = 0;
+elapsedMillis readCommandNRF_ms = 0;
 
 IRrecv irrecv(IR_RECV_PIN);
 
@@ -699,37 +701,31 @@ void ReadFromEEPROM(byte nMode)
 //Get T out, Pressure and Command
 void ReadCommandNRF()
 {
-
-  bool done = false;
-  if ( radio.available() )
+  if (readCommandNRF_ms > READ_COMMAND_NRF_INTERVAL_S * 1000)
   {
-    Serial.println("radio.available!!");
-    while (!done) {                            // Упираемся и
-      done = radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
-      _delay_ms(20);
-      Serial.println("radio.available: ");
-      Serial.println(nrfRequest.tOut);
+    bool done = false;
+    if ( radio.available() )
+    {
+      int cntAvl = 0;
+      Serial.println("radio.available!!");
+      while (!done) {                            // Упираемся и
+        done = radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
+        _delay_ms(20);
+        Serial.println("radio.read: ");
+        Serial.println(nrfRequest.tOut);
+        cntAvl++;
+        if (cntAvl > 10)
+        {
+          radio.powerDown();
+          radio.powerUp();
+        }
+      }
+      //radio.startListening();   // Now, resume listening so we catch the next packets.
+      nrfResponse.Command == RSP_NO;
+      nrfResponse.ventSpeed = 0;
     }
-    //radio.startListening();   // Now, resume listening so we catch the next packets.
-    nrfResponse.Command == RSP_NO;
-    nrfResponse.ventSpeed = 0;
+    readCommandNRF_ms = 0;
   }
-
-  //  if (radio.available())
-  //  {
-  //    Serial.println("radio.available!!");
-  //    //radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
-  //    while (radio.available()) // While there is data ready
-  //    {
-  //      radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
-  //      _delay_ms(20);
-  //      Serial.println("radio.available: ");
-  //      Serial.println(nrfRequest.tOut);
-  //    }
-  //    radio.startListening();   // Now, resume listening so we catch the next packets.
-  //    nrfResponse.Command == RSP_NO;
-  //    nrfResponse.ventSpeed = 0;
-  //  }
 }
 
 void HandleInputNrfCommand()
@@ -775,7 +771,7 @@ void PrepareCommandNRF(byte command, byte ventSpeed, float t_set, byte scenarioV
   nrfResponse.co2 = ppm_v;
   nrfResponse.h = h_v;
 
-  //radio.flush_tx();
+  uint8_t f = radio.flush_tx();
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
 }
 
