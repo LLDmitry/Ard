@@ -292,12 +292,12 @@ void RefreshSensorData()
       Serial.println(ppm_v);
     }
 
-    if (ppm_v == 0)
-    {
-      Serial.println("RESET in 3 sec");
-      _delay_ms(3000);
-      resetFunc(); //вызов reset
-    }
+    //    if (ppm_v == 0)
+    //    {
+    //      Serial.println("RESET in 3 sec");
+    //      _delay_ms(3000);
+    //      resetFunc(); //вызов reset
+    //    }
 
     PrepareCommandNRF(RSP_INFO, 100, -100, 99, 99);
 
@@ -708,18 +708,27 @@ void ReadCommandNRF()
     {
       int cntAvl = 0;
       Serial.println("radio.available!!");
+      _delay_ms(20);
       while (!done) {                            // Упираемся и
         done = radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
         _delay_ms(20);
         Serial.println("radio.read: ");
+        Serial.println(nrfRequest.Command);
+        Serial.println(nrfRequest.minutes);
         Serial.println(nrfRequest.tOut);
+        _delay_ms(20);
         cntAvl++;
         if (cntAvl > 10)
         {
+          Serial.println("powerDown");
+          _delay_ms(20);
           radio.powerDown();
           radio.powerUp();
         }
       }
+      if (nrfRequest.Command != RQ_NO) {
+        HandleInputNrfCommand();
+      };
       //radio.startListening();   // Now, resume listening so we catch the next packets.
       nrfResponse.Command == RSP_NO;
       nrfResponse.ventSpeed = 0;
@@ -823,7 +832,7 @@ void SetLed()
 void loop()
 {
   ReadCommandNRF(); //each loop try read t_out and other info from central control
-  HandleInputNrfCommand();
+
   RefreshSensorData();
   ChangeStatistic();
   CheckIR();

@@ -1524,12 +1524,13 @@ void RadioSetup()
 
 void ReadCommandNRF() //from reponse
 {
-  if (radio.available())
+  if ( radio.available() )
   {
+    bool done = false;
     Serial.println("radio.available!!");
-    while (radio.available()) // While there is data ready
+    while (!done)
     {
-      radio.read(&nrfResponse, sizeof(nrfResponse)); // по адресу переменной nrfResponse функция записывает принятые данные
+      done = radio.read(&nrfResponse, sizeof(nrfResponse));
       _delay_ms(20);
       //radio.stopListening();
       Serial.print("received data from room: ");
@@ -1618,6 +1619,7 @@ void PrepareRequestCommand(byte roomNumber)
   //  Serial.println(hour());
   //  Serial.println(minute());
 }
+
 void SendCommandNRF(byte roomNumber)
 {
   PrepareRequestCommand(roomNumber);
@@ -1634,7 +1636,20 @@ void SendCommandNRF(byte roomNumber)
     else
     {
       Serial.println(F("RESPONSE!!!."));
-      ReadCommandNRF();
+      //ReadCommandNRF();
+
+      bool done = false;
+      Serial.println("radio.available!!");
+      while (!done)
+      {
+        done = radio.read(&nrfResponse, sizeof(nrfResponse));
+        _delay_ms(20);
+        //radio.stopListening();
+        Serial.print("received data from room: ");
+        Serial.println(nrfResponse.roomNumber);
+      }
+      ParseAndHandleInputNrfCommand();
+
     }
   }
   else
@@ -1775,35 +1790,36 @@ void RefreshSensorData()
 // V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEED1, V_TO_SPEED2, V_SPEED1, V_SPEED2, V_TO_OFF, V_OFF
 void VentControl()
 {
-  float kT = 1;
-  if (t_out < -20)  //too cold
-    kT = 1.5;
-  else if (t_out < 30)
-    kT = (-4 * t_out + 525) / (float)arCO2Levels[1];
-  else  //too hot, >30
-    kT = 1.5;
-
-  //  Serial.print("kT=");
-  //  Serial.println(kT);
-  //  Serial.print("modeVent=");
-  //  Serial.println(modeVent[ROOM_BED]);
-  //  Serial.print("t_vent=");
-  //  Serial.println(t_vent);
-  //  Serial.print("t_inn=");
-  //  Serial.println(t_inn[ROOM_BED]);
-  //  Serial.print("co2=");
-  //  Serial.println(co2[ROOM_BED]);
-
-  //for (byte i = 0; i < 5; i++)
-  switch (modeVent[ROOM_BED])
+  if (ventCorrectionPeriod_ms > VENT_CORRECTION_PERIOD_S * 1000)
   {
-    case V_TO_AUTO:
-    case V_AUTO_SPEED1:
-    case V_AUTO_SPEED2:
-    case V_AUTO_SPEED3:
-    case V_AUTO_OFF:
-      if (ventCorrectionPeriod_ms > VENT_CORRECTION_PERIOD_S * 1000)
-      {
+
+    float kT = 1;
+    if (t_out < -20)  //too cold
+      kT = 1.5;
+    else if (t_out < 30)
+      kT = (-4 * t_out + 525) / (float)arCO2Levels[1];
+    else  //too hot, >30
+      kT = 1.5;
+
+    //  Serial.print("kT=");
+    //  Serial.println(kT);
+    //  Serial.print("modeVent=");
+    //  Serial.println(modeVent[ROOM_BED]);
+    //  Serial.print("t_vent=");
+    //  Serial.println(t_vent);
+    //  Serial.print("t_inn=");
+    //  Serial.println(t_inn[ROOM_BED]);
+    //  Serial.print("co2=");
+    //  Serial.println(co2[ROOM_BED]);
+
+    //for (byte i = 0; i < 5; i++)
+    switch (modeVent[ROOM_BED])
+    {
+      case V_TO_AUTO:
+      case V_AUTO_SPEED1:
+      case V_AUTO_SPEED2:
+      case V_AUTO_SPEED3:
+      case V_AUTO_OFF:
         if (co2[ROOM_BED] > arCO2Levels[3] * kT)
           modeVent[ROOM_BED] = V_AUTO_SPEED3;
         if (co2[ROOM_BED] > arCO2Levels[2] * kT)
@@ -1826,27 +1842,30 @@ void VentControl()
           if (modeVent[ROOM_BED] >= V_AUTO_OFF && modeVent[ROOM_BED] < V_AUTO_SPEED3)
             modeVent[ROOM_BED] = modeVent[ROOM_BED] + 1;
         }
-        ventCorrectionPeriod_ms = 0;
-      }
-      break;
 
-    case V_TO_OFF:
-      modeVent[ROOM_BED] = V_OFF;
-      break;
-    case V_TO_SPEED1:
-      modeVent[ROOM_BED] = V_SPEED1;
-      break;
-    case V_TO_SPEED2:
-      modeVent[ROOM_BED] = V_SPEED2;
-      break;
-    case V_TO_SPEED3:
-      modeVent[ROOM_BED] = V_SPEED3;
-      break;
+        break;
+
+      case V_TO_OFF:
+        modeVent[ROOM_BED] = V_OFF;
+        break;
+      case V_TO_SPEED1:
+        modeVent[ROOM_BED] = V_SPEED1;
+        break;
+      case V_TO_SPEED2:
+        modeVent[ROOM_BED] = V_SPEED2;
+        break;
+      case V_TO_SPEED3:
+        modeVent[ROOM_BED] = V_SPEED3;
+        break;
+    }
+
+    digitalWrite(VENT_SPEED1_PIN, modeVent[ROOM_BED] == V_SPEED1 || modeVent[ROOM_BED] == V_AUTO_SPEED1);
+    digitalWrite(VENT_SPEED2_PIN, modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_SPEED3 || modeVent[ROOM_BED] == V_AUTO_SPEED2 || modeVent[ROOM_BED] == V_AUTO_SPEED3);
+    ventCorrectionPeriod_ms = 0;
+
+    Serial.print("modeVent[ROOM_BED]");
+    Serial.println(modeVent[ROOM_BED]);
   }
-
-  digitalWrite(VENT_SPEED1_PIN, modeVent[ROOM_BED] == V_SPEED1 || modeVent[ROOM_BED] == V_AUTO_SPEED1);
-  digitalWrite(VENT_SPEED2_PIN, modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_SPEED3 || modeVent[ROOM_BED] == V_AUTO_SPEED2 || modeVent[ROOM_BED] == V_AUTO_SPEED3);
-
 }
 
 //void NagrevControl()
