@@ -54,7 +54,7 @@
 
 const byte ROOM_NUMBER = ROOM_SENSOR;
 
-const uint32_t REFRESH_SENSOR_INTERVAL_S = 180;  //3 мин
+const uint32_t REFRESH_SENSOR_INTERVAL_S = 30;  //3 мин
 const byte calcNumberSleeps8s = round(REFRESH_SENSOR_INTERVAL_S / 8);
 
 NRFResponse nrfResponse;
@@ -81,7 +81,7 @@ void setup()
   // RF24
   radio.begin();                          // Включение модуля;
   _delay_ms(2);
-  radio.enableAckPayload();                     // Allow optional ack payloads
+ // radio.enableAckPayload();                     // если раскоментарить, будет отправка на все модули
   radio.setPayloadSize(32); //18
   radio.setChannel(ChannelNRF);            // Установка канала вещания;
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
