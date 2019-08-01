@@ -37,7 +37,8 @@ void RadioSetup()
   radio.begin();                          // Включение модуля;
   _delay_ms(2);
 
-  radio.enableAckPayload();
+//  radio.enableAckPayload();
+radio.setAutoAck(true);
   radio.setPayloadSize(32);
   radio.setChannel(0x22);             // Установка канала вещания;
   radio.setRetries(10, 10);               // Установка интервала и количества попыток "дозвона" до приемника;
