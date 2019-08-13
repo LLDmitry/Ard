@@ -46,9 +46,11 @@
 const byte ROOM_NUMBER = ROOM_VENT;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;  //2 мин
+const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
 
 
 elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
+elapsedMillis readCommandNRF_ms = 0;
 
 
 float t_out = 0.0f;
@@ -73,7 +75,6 @@ void setup()
 {
   Serial.begin(9600);
 
-
   // RF24
   radio.begin();                          // Включение модуля;
   delay(2);
@@ -81,13 +82,13 @@ void setup()
   //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
 
   radio.setPayloadSize(32); //18
-  radio.setChannel(ChannelNRF);            // Установка канала вещания;
+  radio.setChannel(ArRoomsChannelsNRF[ROOM_NUMBER]);
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
   //radio.setAutoAck(0);                    // Установка режима подтверждения приема;
   radio.openWritingPipe(CentralReadingPipe);     // Активация данных для отправки
-  radio.openReadingPipe(1, ArRoomsReadingPipes[ROOM_NUMBER]);   // Активация данных для чтения
+  radio.openReadingPipe(1, RoomReadingPipe);   // Активация данных для чтения
   radio.startListening();
 
   radio.printDetails();
@@ -105,8 +106,21 @@ void setup()
   pinMode(P1_PIN, OUTPUT);
   pinMode(P2_PIN, OUTPUT);
 
-
   wdt_enable(WDTO_8S);
+}
+
+//room data
+void PrepareCommandNRF()
+{
+  Serial.println("PrepareCommandNRF1");
+  nrfResponse.Command = RSP_INFO;
+
+  nrfResponse.roomNumber = ROOM_NUMBER;
+
+  nrfResponse.tOut = t_out;
+
+  radio.flush_tx();
+  radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
 }
 
 void RefreshSensorData()
@@ -137,28 +151,7 @@ void RefreshSensorData()
   }
 }
 
-//Get Command
-void ReadCommandNRF()
-{
-  if (radio.available())
-  {
-    Serial.println("radio.available!!");
-    //radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
-    while (radio.available()) // While there is data ready
-    {
-      radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
-      delay(20);
-      Serial.println("radio.available: ");
-      Serial.println(nrfRequest.tOut);
-    }
-    radio.startListening();   // Now, resume listening so we catch the next packets.
-    ParseAndHandleInputNrfCommand();
-    nrfResponse.Command == RSP_NO;
-    nrfResponse.tOut = 99.9;
-  }
-}
-
-void ParseAndHandleInputNrfCommand()
+void HandleInputNrfCommand()
 {
   Serial.print("roomNumber= ");
   Serial.println(nrfRequest.roomNumber);
@@ -172,23 +165,50 @@ void VentControl()
   digitalWrite(VENT_SPEED3_PIN, nrfRequest.ventSpeed == 3);
 }
 
-//send room data
-void PrepareCommandNRF()
+
+
+
+//Get Command
+void ReadCommandNRF()
 {
-  Serial.println("PrepareCommandNRF1");
-  nrfResponse.Command = RSP_INFO;
 
-  nrfResponse.roomNumber = ROOM_NUMBER;
+  if (readCommandNRF_ms > READ_COMMAND_NRF_INTERVAL_S * 1000)
+  {
+    bool done = false;
+    if (radio.available())
+    {
+      int cntAvl = 0;
+      Serial.println("radio.available!!");
+      while (!done) {
+        done = radio.read(&nrfRequest, sizeof(nrfRequest));
+        delay(20);
+        Serial.println("radio.available: ");
+        Serial.println(nrfRequest.tOut);
 
-  nrfResponse.tOut = t_out;
+        cntAvl++;
+        if (cntAvl > 10)
+        {
+          Serial.println("powerDown");
+          _delay_ms(20);
+          radio.powerDown();
+          radio.powerUp();
+        }
+        if (nrfRequest.Command != RQ_NO) {
+          HandleInputNrfCommand();
+        };
 
-  radio.flush_tx();
-  radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
+        nrfResponse.Command == RSP_NO;
+        nrfResponse.tOut = 99.9;
+      }
+    }
+    readCommandNRF_ms = 0;
+  }
 }
+
 
 void loop()
 {
-  ReadCommandNRF(); //each loop try get command from central control
+  ReadCommandNRF();
   //HandleInputNrfCommand();
   RefreshSensorData();
   wdt_reset();

@@ -7,8 +7,11 @@
 #include "Arduino.h"
 
 const uint64_t CentralReadingPipe = 0xE8E8F0F0ABLL;  // д.б. один для всех rooms, = readingPipe CentralControl 
-const uint64_t ArRoomsReadingPipes[] = {0xE8E8F0F0AALL, 0xE8E8F0F0A1LL, 0xE8E8F0F0A2LL, 0xE8E8F0F0A3LL, 0xE8E8F0F0A4LL, 0xE8E8F0F0A5LL, 0xE8E8F0F0A6LL, 0xE8E8F0F0A7LL};
-const uint8_t ChannelNRF = 0x60;
+const uint64_t RoomReadingPipe = 0xE8E8F0F0AALL;  // д.б. один для всех rooms
+const uint8_t ArRoomsChannelsNRF[] = {50, 51, 52, 53, 54, 55, 56, 57};
+
+//const uint64_t ArRoomsReadingPipes[] = {0xE8E8F0F0AALL, 0xE8E8F0F0A1LL, 0xE8E8F0F0A2LL, 0xE8E8F0F0A3LL, 0xE8E8F0F0A4LL, 0xE8E8F0F0A5LL, 0xE8E8F0F0A6LL, 0xE8E8F0F0A7LL};
+//const uint8_t ChannelNRF = 0x60;
 
 enum enRequestCommand { RQ_NO, RQ_T_INFO, RQ_CLOSE_VODA_1, RQ_CLOSE_VODA_2, RQ_ALARM_SHORT, RQ_ALARM_LONG, RQ_VENT };
 enum enResponseCommand { RSP_NO, RSP_INFO, RSP_COMMAND };

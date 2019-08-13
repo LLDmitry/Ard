@@ -377,20 +377,18 @@ void setup()
 void RadioSetup()
 {
   //RF24
-  //стоило переключить CS с 9 ножки в + и все бодренько заработало
-
   radio.begin();                          // Включение модуля;
   _delay_ms(2);
   radio.enableAckPayload();       //+
   radio.setPayloadSize(32);
-  radio.setChannel(ChannelNRF);             // Установка канала вещания;
-  //radio.setRetries(10, 10);               // Установка интервала и количества попыток "дозвона" до приемника;
+  radio.setChannel(ArRoomsChannelsNRF[ROOM_SENSOR]);             // Установка канала вещания;
+  radio.setRetries(10, 10);               // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);            // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);            // Установка максимальной мощности;
   //radio.setAutoAck(0);                    // Установка режима подтверждения приема;
-  //  radio.openWritingPipe(writingPipe);   // Активация данных для отправки
+  radio.openWritingPipe(RoomReadingPipe);   // Активация данных для отправки
   radio.openReadingPipe(1, CentralReadingPipe);    // Активация данных для чтения
-  //radio.startListening();
+  radio.startListening();
 
   radio.printDetails();
 }
@@ -1545,13 +1543,16 @@ void NrfCommunication()
   ResetExternalData();
   if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
   {
-    radio.openWritingPipe(ArRoomsReadingPipes[ROOM_SENSOR]); //for confirm writes
-    ReadCommandNRF();
+    //
+    //    radio.setChannel(ArRoomsChannelsNRF[ROOM_SENSOR]);
+    //    radio.openWritingPipe(ArRoomsReadingPipes[ROOM_SENSOR]); //for confirm writes
+    ReadCommandNRF(); // from ROOM_SENSOR
     radio.stopListening();
-    for (byte iRoom = 0; iRoom <= 6; iRoom++)
+    for (byte iRoom = 0; iRoom < ROOM_SENSOR; iRoom++)
     {
       SendCommandNRF(iRoom);
     }
+    radio.setChannel(ArRoomsChannelsNRF[ROOM_SENSOR]);
     radio.startListening();
     lastNrfCommunication_ms = 0;
     FillAlarmStatuses();
@@ -1626,7 +1627,8 @@ void SendCommandNRF(byte roomNumber)
 
   Serial.print("roomNumber: ");
   Serial.println(roomNumber);
-  radio.openWritingPipe(ArRoomsReadingPipes[roomNumber]);
+  //radio.openWritingPipe(ArRoomsReadingPipes[roomNumber]);
+  radio.setChannel(ArRoomsChannelsNRF[roomNumber]);
   if (radio.write(&nrfRequest, sizeof(nrfRequest)))
   {
     Serial.println("Success Send");

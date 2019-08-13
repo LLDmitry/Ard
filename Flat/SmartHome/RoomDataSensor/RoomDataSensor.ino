@@ -53,8 +53,8 @@
 #define ONE_WIRE_PIN 5       // DS18b20
 
 const byte ROOM_NUMBER = ROOM_SENSOR;
+const uint32_t REFRESH_SENSOR_INTERVAL_S = 30;
 
-const uint32_t REFRESH_SENSOR_INTERVAL_S = 30;  //3 мин
 const byte calcNumberSleeps8s = round(REFRESH_SENSOR_INTERVAL_S / 8);
 
 NRFResponse nrfResponse;
@@ -81,14 +81,14 @@ void setup()
   // RF24
   radio.begin();                          // Включение модуля;
   _delay_ms(2);
- // radio.enableAckPayload();                     // если раскоментарить, будет отправка на все модули
+  radio.enableAckPayload();                     // если раскоментарить, будет отправка на все модули
   radio.setPayloadSize(32); //18
-  radio.setChannel(ChannelNRF);            // Установка канала вещания;
-  radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
+  radio.setChannel(ArRoomsChannelsNRF[ROOM_NUMBER]);
+  radio.setRetries(10, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
   radio.openWritingPipe(CentralReadingPipe);     // Активация данных для отправки
-  radio.openReadingPipe(1, ArRoomsReadingPipes[ROOM_NUMBER]);   // Активация данных для чтения
+  radio.openReadingPipe(1, RoomReadingPipe);   // Активация данных для чтения
   radio.stopListening();
   radio.printDetails();
 
@@ -110,7 +110,8 @@ void RefreshSensorData()
 {
   Serial.println("RefreshSensorData");
   sensors.requestTemperatures();
-  tOut = sensors.getTempCByIndex(0); // 11.01 + random(1, 10)
+  //tOut = sensors.getTempCByIndex(0); // 
+ //tOut = 11.01 + random(1, 10);
   Serial.print("tOut=");
   Serial.println(tOut);
 }

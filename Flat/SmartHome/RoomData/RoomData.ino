@@ -211,13 +211,13 @@ void setup()
   //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
 
   radio.setPayloadSize(32); //18
-  radio.setChannel(ChannelNRF);            // Установка канала вещания;
+  radio.setChannel(ArRoomsChannelsNRF[ROOM_NUMBER]);
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
   //radio.setAutoAck(0);                    // Установка режима подтверждения приема;
   radio.openWritingPipe(CentralReadingPipe);     // Активация данных для отправки
-  radio.openReadingPipe(1, ArRoomsReadingPipes[ROOM_NUMBER]);   // Активация данных для чтения
+  radio.openReadingPipe(1, RoomReadingPipe);   // Активация данных для чтения
   radio.startListening();
 
   radio.printDetails();
@@ -292,12 +292,12 @@ void RefreshSensorData()
       Serial.println(ppm_v);
     }
 
-    //    if (ppm_v == 0)
-    //    {
-    //      Serial.println("RESET in 3 sec");
-    //      _delay_ms(3000);
-    //      resetFunc(); //вызов reset
-    //    }
+    if (ppm_v == 0)
+    {
+      Serial.println("RESET in 3 sec");
+      _delay_ms(3000);
+      resetFunc(); //вызов reset
+    }
 
     PrepareCommandNRF(RSP_INFO, 100, -100, 99, 99);
 
