@@ -8,7 +8,7 @@
 // GND VCC CE  CSN MOSI  MISO  SCK
 //          9  10  11    12    13
 //  http://robotclass.ru/tutorials/arduino-radio-nrf24l01/
-/// !!!  https://wiki.iarduino.ru/page/NRF24L01-trema/
+///   https://wiki.iarduino.ru/page/NRF24L01-trema/
 //
 
 #include <NrfCommands.h> // C:\Program Files (x86)\Arduino\libraries\NrfCommands
@@ -1638,7 +1638,7 @@ void SendCommandNRF(byte roomNumber)
       Serial.println(F("Empty response."));
     else
     {
-      Serial.println(F("RESPONSE!!!."));
+      Serial.println(F("RESPONSE!."));
       //ReadCommandNRF();
 
       bool done = false;
