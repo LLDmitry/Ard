@@ -41,6 +41,9 @@
 //RNF SPI bus plus pins  9,10 для Уно или 9, 53 для Меги
 #define CE_PIN 6
 #define CSN_PIN 7
+#define RNF_MOSI      51
+#define RNF_MISO      50
+#define RNF_SCK       52
 
 //#define MP3_BUSY_PIN 11    // пин от BUSY плеера
 //#define BTTN_PIN 12       // ручное управление командами
@@ -48,9 +51,6 @@
 //#define MIC_PIN 14        // активация микрофона(т.е. переключение на микрофон вместо MP3)
 //#define REGISTRATOR_PIN 15// активация регистратора
 //#define ADD_DEVICE_PIN 16 // дополнительное устройство
-
-#define VENT_SPEED1_PIN 8
-#define VENT_SPEED2_PIN 9
 
 #define DHTTYPE DHT22
 
@@ -1666,6 +1666,7 @@ void ParseAndHandleInputNrfCommand()
   Serial.println(nrfResponse.roomNumber);
   Serial.print("Tinn= ");
   Serial.println(nrfResponse.tInn);
+
   alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
   t_inn[nrfResponse.roomNumber] = nrfResponse.tInn;
   co2[nrfResponse.roomNumber] = nrfResponse.co2;
@@ -1675,12 +1676,17 @@ void ParseAndHandleInputNrfCommand()
     Serial.print("              CO2= ");
     Serial.println(nrfResponse.co2);
   }
-
+  if (nrfResponse.roomNumber == ROOM_VENT)
+  {
+    t_out1 = nrfResponse.tOut;
+    Serial.print("            Tout1= ");
+    Serial.println(nrfResponse.tOut);
+  }
   if (nrfResponse.roomNumber == ROOM_SENSOR)
   {
     t_out2 = nrfResponse.tOut;
     lastGetExternalData_ms = 0;
-    Serial.print("              T_r_out= ");
+    Serial.print("              Tout2= ");
     Serial.println(nrfResponse.tOut);
   }
   //      h[nrfResponse.roomNumber] = nrfResponse.h;
@@ -1774,7 +1780,7 @@ void RefreshSensorData()
     sensors.requestTemperatures();
     //    //float realTemper = sensors.getTempCByIndex(0);
     //    //t_inn = sensors.getTempC(innerTempDeviceAddress);
-    t_out1 = sensors.getTempC(outer1TempDeviceAddress);
+    //t_out1 = sensors.getTempC(outer1TempDeviceAddress);
     //    t_vent = sensors.getTempC(ventTempDeviceAddress);
     t_vent = t_out1;
     //    t_unit = sensors.getTempC(unitTempDeviceAddress);
