@@ -66,7 +66,6 @@ volatile byte old_ADCSRA;
 float tOut = 0.0f;
 bool doubleFaileSend = false;
 
-// Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
 
 OneWire ds(ONE_WIRE_PIN);
@@ -110,8 +109,8 @@ void RefreshSensorData()
 {
   Serial.println("RefreshSensorData");
   sensors.requestTemperatures();
-  //tOut = sensors.getTempCByIndex(0); // 
- //tOut = 11.01 + random(1, 10);
+  tOut = sensors.getTempCByIndex(0); //
+  //tOut = 11.01 + random(1, 10);
   Serial.print("tOut=");
   Serial.println(tOut);
 }
