@@ -53,7 +53,7 @@
 #define ONE_WIRE_PIN 5       // DS18b20
 
 const byte ROOM_NUMBER = ROOM_SENSOR;
-const uint32_t REFRESH_SENSOR_INTERVAL_S = 30;
+const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;
 
 const byte calcNumberSleeps8s = round(REFRESH_SENSOR_INTERVAL_S / 8);
 
@@ -129,24 +129,26 @@ void SendCommandNRF()
   PrepareCommandNRF();
 
   Serial.print("SendNRF ");
-  if (radio.write(&nrfResponse, sizeof(nrfResponse)))
-  {
-    Serial.println("Success Send");
-    doubleFaileSend = false;
-    _delay_ms(10);
-  }
-  else
-  {
-    Serial.println("Failed Send");
-    if (doubleFaileSend)
-    {
-      Serial.println("RESET");
-      _delay_ms(50);
-      resetFunc(); //вызов reset
-    }
-    else
-      doubleFaileSend = true;
-  }
+  radio.flush_tx();
+  radio.write(&nrfResponse, sizeof(nrfResponse));
+//  if (radio.write(&nrfResponse, sizeof(nrfResponse)))
+//  {
+//  //  Serial.println("Success Send");
+//    doubleFaileSend = false;
+//    _delay_ms(10);
+//  }
+//  else
+//  {
+//  //  Serial.println("Failed Send");
+//    if (doubleFaileSend)
+//    {
+//      Serial.println("RESET");
+//      _delay_ms(50);
+//      resetFunc(); //вызов reset
+//    }
+//    else
+//      doubleFaileSend = true;
+//  }
 }
 
 //void GoSleep()

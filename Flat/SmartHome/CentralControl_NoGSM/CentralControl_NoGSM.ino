@@ -94,7 +94,7 @@ const unsigned long GET_EXTERNAL_DATA_INTERVAL_S = 600;
 //Параметры комфорта
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
 const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;
-const float MAX_COMFORT_ROOM_TEMP = 23.0;
+const float MAX_COMFORT_ROOM_TEMP = 24.5;
 const float BORDER_WINTER_SUMMER = 10; // +10c
 
 const int arCO2Levels[3] = {450, 600, 900};
@@ -1638,11 +1638,11 @@ void SendCommandNRF(byte roomNumber)
       Serial.println(F("Empty response."));
     else
     {
-      Serial.println(F("RESPONSE!."));
+      //  Serial.println(F("RESPONSE!."));
       //ReadCommandNRF();
 
       bool done = false;
-      Serial.println("radio.available!!");
+      //  Serial.println("radio.available!!");
       while (!done)
       {
         done = radio.read(&nrfResponse, sizeof(nrfResponse));
@@ -1655,8 +1655,8 @@ void SendCommandNRF(byte roomNumber)
 
     }
   }
-  else
-    Serial.println("Failed Send");
+  // else
+  // Serial.println("Failed Send");
 }
 
 void ParseAndHandleInputNrfCommand()
@@ -1720,8 +1720,8 @@ void ParseAndHandleInputNrfCommand()
         modeVent[nrfResponse.roomNumber] = V_TO_SPEED2;
       break;
     case 3: //3d speed
-      if (modeVent[nrfResponse.roomNumber] != V_SPEED3)
-        modeVent[nrfResponse.roomNumber] = V_TO_SPEED3;
+      if (modeVent[nrfResponse.roomNumber] != V_SPEED2)
+        modeVent[nrfResponse.roomNumber] = V_TO_SPEED2; //V_TO_SPEED3
       break;
     case 100: //auto
       if (modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED1 &&
@@ -1733,8 +1733,8 @@ void ParseAndHandleInputNrfCommand()
       }
       break;
   }
-  Serial.print("modeVent= ");
-  Serial.println(modeVent[nrfResponse.roomNumber]);
+  //Serial.print("modeVent= ");
+  //Serial.println(modeVent[nrfResponse.roomNumber]);
   //      break;
   //
   //    case IN_CENTRAL_COMMAND:
@@ -1771,7 +1771,7 @@ void ParseAndHandleInputNrfCommand()
   //      break;
   //  }
 }
-//
+
 void RefreshSensorData()
 {
   if (lastRefreshSensor_ms > REFRESH_SENSOR_INTERVAL_S * 1000)

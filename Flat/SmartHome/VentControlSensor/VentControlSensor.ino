@@ -45,7 +45,7 @@
 
 const byte ROOM_NUMBER = ROOM_VENT;
 
-const uint32_t REFRESH_SENSOR_INTERVAL_S = 120;  //2 мин
+const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;
 const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
 
 
@@ -133,8 +133,8 @@ void RefreshSensorData()
     sensors.requestTemperatures();
     t_out = sensors.getTempCByIndex(0);
 
-    if (t_out == -127)
-      t_out = 22.33;
+//    if (t_out == -127)
+//      t_out = 22.33;
     Serial.print("t_out=");
     Serial.println(t_out);
 
