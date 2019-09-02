@@ -1705,6 +1705,38 @@ void ParseAndHandleInputNrfCommand()
   //
   //    case IN_ROOM_COMMAND:
   //V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEED1, V_TO_SPEED2, V_SPEED1, V_SPEED2, V_TO_OFF, V_OFF
+<<<<<<< HEAD
+  switch (nrfResponse.ventSpeed) //0-not supported, 1,2,3: 1-3st speed, 10 - off, 100 - auto
+  {
+    case 10: //off
+      if (modeVent[nrfResponse.roomNumber] != V_OFF)
+        modeVent[nrfResponse.roomNumber] = V_TO_OFF;
+      break;
+    case 1: //1st speed
+      if (modeVent[nrfResponse.roomNumber] != V_SPEED1)
+        modeVent[nrfResponse.roomNumber] = V_TO_SPEED1;
+      break;
+    case 2: //2d speed
+      if (modeVent[nrfResponse.roomNumber] != V_SPEED2)
+        modeVent[nrfResponse.roomNumber] = V_TO_SPEED2;
+      break;
+    case 3: //3d speed
+      if (modeVent[nrfResponse.roomNumber] != V_SPEED2)
+        modeVent[nrfResponse.roomNumber] = V_TO_SPEED2; //V_TO_SPEED3
+      break;
+    case 100: //auto
+      if (modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED1 &&
+          modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED2 &&
+          modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED3 &&
+          modeVent[nrfResponse.roomNumber] != V_AUTO_OFF)
+      {
+        modeVent[nrfResponse.roomNumber] = V_TO_AUTO;
+      }
+      break;
+  }
+  //Serial.print("modeVent= ");
+  //Serial.println(modeVent[nrfResponse.roomNumber]);
+=======
 //  switch (nrfResponse.ventSpeed) //0-not supported, 1,2,3: 1-3st speed, 10 - off, 100 - auto
 //  {
 //    case 10: //off
@@ -1735,6 +1767,7 @@ void ParseAndHandleInputNrfCommand()
 //  }
 //  Serial.print("modeVent= ");
 //  Serial.println(modeVent[nrfResponse.roomNumber]);
+>>>>>>> a471821907aa47e275fe23e44330144411f5006f
   //      break;
   //
   //    case IN_CENTRAL_COMMAND:
