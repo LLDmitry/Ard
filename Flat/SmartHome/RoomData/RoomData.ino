@@ -468,7 +468,7 @@ void ShowStatistic()
 
   switch (Mode)
   {
-    case 1: //T inn
+    case 1: //T inn -5.0 from real T
       topVal = maxVal > 250 ? 255 : maxVal + 5;
       baseVal = topVal < 30 ? 0 : topVal - 30; //30 = 3c
       //baseVal = BASE_VAL_T_IN;
@@ -667,8 +667,8 @@ byte ConvertToByte(byte mode, float val)
 {
   switch (mode)
   {
-    case 1: //T inn
-      return ((byte)(val * 10));
+    case 1: //T inn от до +30
+      return ((byte)((val-50) * 10));
       break;
     case 2: //T out  от -32 до +32
       return ((byte)((32 + val) * 4));
