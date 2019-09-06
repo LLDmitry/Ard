@@ -1828,7 +1828,7 @@ void VentControl()
       case V_AUTO_SPEED3:
       case V_AUTO_OFF:
         if (co2[ROOM_BED] > (arCO2Levels[3] * kT))
-          modeVent[ROOM_BED] = V_AUTO_SPEED3;
+          modeVent[ROOM_BED] = V_AUTO_SPEED2;
         if (co2[ROOM_BED] > (arCO2Levels[2] * kT))
           modeVent[ROOM_BED] = V_AUTO_SPEED2;
         else if (co2[ROOM_BED] > (arCO2Levels[1] * kT))
@@ -1849,14 +1849,14 @@ void VentControl()
         //reduce speed or off if too cold in room
         if (t_inn[ROOM_BED] < (t_out < BORDER_WINTER_SUMMER ? MIN_COMFORT_ROOM_TEMP_WINTER : MIN_COMFORT_ROOM_TEMP_SUMMER) && t_inn[ROOM_BED] > t_vent)
         {
-          if (modeVent[ROOM_BED] >= V_AUTO_SPEED1 && modeVent[ROOM_BED] <= V_AUTO_SPEED3)
+          if (modeVent[ROOM_BED] >= V_AUTO_SPEED1 && modeVent[ROOM_BED] > V_AUTO_SPEED1)
             modeVent[ROOM_BED] = modeVent[ROOM_BED] - 1;
         }
 
         //increase speed if too hot in room
         if (t_inn[ROOM_BED] > MAX_COMFORT_ROOM_TEMP && t_inn[ROOM_BED] > t_out)
         {
-          if (modeVent[ROOM_BED] >= V_AUTO_OFF && modeVent[ROOM_BED] < V_AUTO_SPEED3)
+          if (modeVent[ROOM_BED] >= V_AUTO_OFF && modeVent[ROOM_BED] < V_AUTO_SPEED2)
             modeVent[ROOM_BED] = modeVent[ROOM_BED] + 1;
         }
 
