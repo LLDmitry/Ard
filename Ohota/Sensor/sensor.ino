@@ -4,6 +4,13 @@
 #include "printf.h"
 #include <elapsedMillis.h>
 
+#include <avr/sleep.h>     //AVR MCU power management
+#include <avr/power.h>     //disable/anable AVR MCU peripheries (Analog Comparator, ADC, USI, Timers/Counters)
+#include <avr/wdt.h>       //AVR MCU watchdog timer
+#include <avr/io.h>        //includes the apropriate AVR MCU IO definitions
+#include <avr/interrupt.h> //manipulation of the interrupt flags
+#include <util/delay.h>
+
 #define RNF_CE_PIN    10
 #define RNF_CSN_PIN   9
 #define RNF_MOSI      11
@@ -27,9 +34,15 @@ int outCommand = 0;
 
 elapsedMillis lastRefreshSensor_ms = REFRESH_SENSOR_INTERVAL_S * 1000;
 
+// watchdog interrupt
+ISR(WDT_vect)
+{
+  wdt_disable();  // disable watchdog
+}  // end of WDT_vect
+
 void setup(void)
 {
-
+  wdt_disable();
   // RF24
   radio.begin();                          // Включение модуля;
   delay(2);
@@ -46,6 +59,8 @@ void setup(void)
   pinMode(BTN_PIN, INPUT_PULLUP);
   pinMode(SENSOR_PIN, INPUT_PULLUP);
   pinMode(LED_PIN, OUTPUT);
+
+  wdt_enable(WDTO_2S);
 }
 
 void ReadCommandNRF()
@@ -98,8 +113,74 @@ void WriteCommandNRF()
   radio.startListening();
 }
 
+void Wake()
+{
+  // cancel sleep as a precaution
+  sleep_disable();
+  // precautionary while we do other stuff
+  detachInterrupt(0);
+  detachInterrupt(1);
+  // enable ADC
+  //ADCSRA = old_ADCSRA;
+}
+
+void GoSleep()
+{
+  // clear various "reset" flags
+  MCUSR = 0;
+  // allow changes, disable reset
+  WDTCSR = bit(WDCE) | bit(WDE);
+  // set interrupt mode and an interval
+  //WDTCSR = bit(WDIE) | bit(WDP2) | bit(WDP1);    // set WDIE, and 1 second delay
+  WDTCSR = bit(WDIE) | bit(WDP3) | bit(WDP0);    // set WDIE, and 8 seconds delay
+  wdt_reset();  // pat the dog
+
+  // disable ADC
+  //old_ADCSRA = ADCSRA;
+  ADCSRA = 0;
+
+  // turn off various modules
+  byte old_PRR = PRR;
+  PRR = 0xFF;
+
+  // timed sequence coming up
+  noInterrupts();
+
+  // will be called when pin D2 goes low
+  attachInterrupt(0, Wake, FALLING ); //FALLING RISING
+  EIFR = bit(INTF0);  // clear flag for interrupt 0
+
+  // will be called when pin D3 goes low
+  attachInterrupt(1, Wake, FALLING);
+  EIFR = bit(INTF1);  // clear flag for interrupt 1
+
+  // ready to sleep
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable();
+
+  // turn off brown-out enable in software
+  MCUCR = bit(BODS) | bit(BODSE);
+  MCUCR = bit(BODS);
+  interrupts(); // guarantees next instruction executed
+  sleep_cpu();
+
+  // cancel sleep as a precaution
+  sleep_disable();
+  PRR = old_PRR;
+  //ADCSRA = old_ADCSRA;
+}
+
 void loop(void)
 {
-  ReadCommandNRF();
+  radio.powerDown();
+  GoSleep(); //1 sec sleep
+  sleep_disable();
+  radio.powerUp();
+  power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
   RefreshSensorData();
+  ReadCommandNRF();
+  wdt_reset();
 }
+
+
+
