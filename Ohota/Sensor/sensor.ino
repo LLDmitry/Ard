@@ -20,6 +20,8 @@
 #define BTN_PIN       2
 #define SENSOR_PIN    3
 #define LED_PIN       5
+#define IR_LED_PIN    6
+#define BZZ_PIN       7
 
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
 
@@ -28,11 +30,23 @@ const byte CH_NRF = 15;
 const uint64_t central_read_pipe = 0xE8E8F0F0E1LL;
 const uint64_t central_write_pipe = 0xFFFFFFFF00ULL;
 const unsigned long REFRESH_SENSOR_INTERVAL_S = 5;
+const unsigned long STOP_SENSOR_INTERVAL_S = 100; //в течение этого времени после отработки срабатываниия сенсора не будет регестрироваться нового срабатывния
 
 int inCommand = 0;
 int outCommand = 0;
 
+bool motionDetect = false;
+bool status_LED = false;
+bool status_IR_LED = false;
+bool status_BZZ = false;
+bool alarm_LED = false;
+bool alarm_IR_LED = false;
+
 elapsedMillis lastRefreshSensor_ms = REFRESH_SENSOR_INTERVAL_S * 1000;
+elapsedMillis lastSensorActionOff_ms = STOP_SENSOR_INTERVAL_S * 1000;
+
+enum EnInCommand { ALL_OFF, MOTION_DETECT, MOTION_DETECT_LIGHT_ON, MOTION_DETECT_IR_LIGHT_ON, LIGHT_ON, IR_LIGHT_ON, BZZ_ON, ACTION_OFF } dtmfCommandMode = ALL_OFF;
+//EnInOperation inOperation;
 
 // watchdog interrupt
 ISR(WDT_vect)
@@ -59,6 +73,8 @@ void setup(void)
   pinMode(BTN_PIN, INPUT_PULLUP);
   pinMode(SENSOR_PIN, INPUT_PULLUP);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(IR_LED_PIN, OUTPUT);
+  pinMode(BZZ_PIN, OUTPUT);
 
   wdt_enable(WDTO_2S);
 }
@@ -77,30 +93,59 @@ void ReadCommandNRF()
 
 void HandleCommand()
 {
-  if (highByte(inCommand) == SENSOR_NUMBER)
+  if (highByte(inCommand) == SENSOR_NUMBER) //если комманда данному блоку или всем блокам
 
+    //enum EnInOperation { ALL_OFF, MOTION_DETECT, MOTION_DETECT_LIGHT_ON, MOTION_DETECT_IR_LIGHT_ON, LIGHT_ON, IR_LIGHT_ON, BZZ_ON, ACTION_OFF } dtmfCommandMode = ALL_OFF;
     switch lowByte(inCommand)
     {
-      case 0:
-        digitalWrite(LED_PIN, LOW);
+      case ALL_OFF:
+        motionDetect = false;
+        status_LED = false;
+        status_IR_LED = false;
+        status_BZZ = false;
         break;
-      case 1:
-        digitalWrite(LED_PIN, HIGH);
+      case MOTION_DETECT:
+        motionDetect = true;
+        break;
+      case MOTION_DETECT_LIGHT_ON:
+        motionDetect = true;
+        alarm_LED = true;
+        break;
+      case MOTION_DETECT_IR_LIGHT_ON:
+        motionDetect = true;
+        alarm_IR_LED = true;
+        break;
+      case LIGHT_ON:
+        status_LED = true;
+        break;
+      case IR_LIGHT_ON:
+        status_IR_LED = true;
+        break;
+      case BZZ_ON:
+        status_BZZ = true;
+        break;
+      case ACTION_OFF:
+        lastSensorActionOff_ms = 0;
+        status_LED = false;
+        status_IR_LED = false;
+        status_BZZ = false;
         break;
     }
+
+
 }
 
 void RefreshSensorData()
 {
-  if (lastRefreshSensor_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
-  {
-    Serial.println("RefreshSensorData");
+  //if (lastRefreshSensor_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
+  //{
+  Serial.println("RefreshSensorData");
 
-    byte sensor = digitalRead(SENSOR_PIN);
-    outCommand = (SENSOR_NUMBER << 8) | sensor;
-    WriteCommandNRF();
-    lastRefreshSensor_ms = 0;
-  }
+  byte sensor = digitalRead(SENSOR_PIN);
+  outCommand = (SENSOR_NUMBER << 8) | sensor;
+  WriteCommandNRF();
+  lastRefreshSensor_ms = 0;
+  //}
 }
 
 void WriteCommandNRF()
@@ -170,6 +215,25 @@ void GoSleep()
   //ADCSRA = old_ADCSRA;
 }
 
+void CheckMotion()
+{
+  if (motionDetect && lastSensorActionOff_ms > (STOP_SENSOR_INTERVAL_S * 1000) && digitalRead(SENSOR_PIN))
+  {
+    if (alarm_LED)
+      status_LED = true;
+
+    if (alarm_IR_LED)
+      status_IR_LED = true;
+  }
+}
+
+void ControlLedAndBZZ()
+{
+  digitalWrite(LED_PIN, status_LED);
+  digitalWrite(IR_LED_PIN, status_IR_LED);
+  digitalWrite(BZZ_PIN, status_BZZ);
+}
+
 void loop(void)
 {
   radio.powerDown();
@@ -179,6 +243,8 @@ void loop(void)
   power_all_enable();         //enable all peripheries (ADC, Timer0, Timer1, Universal Serial Interface)
   RefreshSensorData();
   ReadCommandNRF();
+  CheckMotion();
+  ControlLedAndBZZ();
   wdt_reset();
 }
 
