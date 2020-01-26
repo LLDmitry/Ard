@@ -27,9 +27,8 @@
 #define RNF_MISO      12
 #define RNF_SCK       13
 
-const byte ROOM_NUMBER = ROOM_VANNA1;
-
-const boolean solenoidNormalOpened = true;
+const byte ROOM_NUMBER = ROOM_VANNA2; //ROOM_VANNA1
+const boolean SOLENOID_NORMAL_OPENED = false; //true
 
 const unsigned long MANUAL_OPEN_DURATION_SEC = 10800; //3 hours
 const unsigned long MANUAL_CLOSE_DURATION_SEC = 10; //10s
@@ -94,24 +93,28 @@ void setup()
   //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
 
   radio.setPayloadSize(32); //18
-  radio.setChannel(ChannelNRF);            // Установка канала вещания;
+  radio.setChannel(ArRoomsChannelsNRF[ROOM_NUMBER]);            // Установка канала вещания;
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
   //radio.setAutoAck(0);                    // Установка режима подтверждения приема;
   radio.openWritingPipe(CentralReadingPipe);     // Активация данных для отправки
-  radio.openReadingPipe(1, ArRoomsReadingPipes[ROOM_NUMBER]);   // Активация данных для чтения
+  radio.openReadingPipe(1, RoomReadingPipe);   // Активация данных для чтения
   radio.startListening();
 
   radio.printDetails();
 
   sensors.begin();
-  sensors.getAddress(InnTempDeviceAddress, 0);
+
+  sensors.getAddress(HotVodaTempDeviceAddress, 0);
   sensors.getAddress(ColdVodaTempDeviceAddress, 1);
-  sensors.getAddress(HotVodaTempDeviceAddress, 2);
+  sensors.getAddress(InnTempDeviceAddress, 2);
+
   sensors.setResolution(InnTempDeviceAddress, 12);
   sensors.setResolution(ColdVodaTempDeviceAddress, 10);
   sensors.setResolution(HotVodaTempDeviceAddress, 10);
+
+  switchSolenoid(); // для открытия NormalOpen клапана
 
   // enable the watchdog timer. There are a finite number of timeouts allowed (see wdt.h).
   // Notes I have seen say it is unwise to go below 250ms as you may get the WDT stuck in a
@@ -166,6 +169,7 @@ void CheckVoda()
     if (vodaMode == 0 && AvgVoda == 1)
     {
       closeVoda = true;
+      alarmInterval_ms = 0;
       vodaMode = 1;
       switchSolenoid();
     }
@@ -195,6 +199,7 @@ void VodaControl(int typeControl) //0 - auto check, 1-short click, 2-long click
         vodaMode = 3; //temporary close voda (testing)
         manualCloseTime_ms = 0;
         closeVoda = true;
+        alarmInterval_ms = 0;
         switchSolenoid();
       }
       else if (vodaMode == 1)
@@ -219,7 +224,7 @@ void VodaControl(int typeControl) //0 - auto check, 1-short click, 2-long click
 
 void switchSolenoid()
 {
-  digitalWrite(SOLENOID_PIN, solenoidNormalOpened ? closeVoda : !closeVoda);
+  digitalWrite(SOLENOID_PIN, SOLENOID_NORMAL_OPENED ? closeVoda : !closeVoda);
   if (closeVoda)
   {
     PrepareCommandNRF();
@@ -286,7 +291,7 @@ void loop()
 {
   switch (btn.Loop()) {
     case SB_CLICK:
-      Serial.println("btnShort"); //temporary open voda
+      Serial.println("btnShort"); //temporary open voda if was closed, or close if was opened for testing
       VodaControl(1);
       break;
     case SB_LONG_CLICK:

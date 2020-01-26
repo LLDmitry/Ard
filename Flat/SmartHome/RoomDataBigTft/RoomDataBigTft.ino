@@ -1,6 +1,8 @@
 //Room data modified (get T_out and p_v, send CO2)
 //Аппаратный SPI  http://www.poprobot.ru/home/Arduino-TFT-SPI  http://robotchip.ru/podklyuchenie-tft-displeya-1-8-k-arduino/
 //Как известно, Arduino имеет встроенный аппаратный SPI. На Arduino Nano для этого используются выводы с 10 по 13.
+// move nrf to soft spi http://forum.amperka.ru/threads/nrf24l-spi-tft-display.7748/   https://forum.arduino.cc/index.php?topic=545575.0
+// http://forum.amperka.ru/threads/nrf24l01-%D0%BF%D0%BE%D0%B1%D0%B5%D0%B6%D0%B4%D0%B0%D0%B5%D0%BC-%D0%BC%D0%BE%D0%B4%D1%83%D0%BB%D1%8C.3205/page-36
 //TFT: https://www.arduino.cc/en/Guide/TFT
 // TFT 160x128
 // GND   GND
@@ -19,13 +21,12 @@
 //Питание – на 3,3 В
 
 #include <NrfCommands.h>
-#include <TFT.h>
 #include "SoftwareSerial.h"
 #include "DHT.h"
 #include <elapsedMillis.h>
-#include <SPI.h>                 // Подключаем библиотеку SPI
 #include <Wire.h>
 #include <EEPROM.h>
+#include "nRF24L01.h"
 #include <RF24.h>
 #include <RF24_config.h>
 #include <stdio.h> // for function sprintf
@@ -34,15 +35,13 @@
 #include <avr/wdt.h>
 #include <util/delay.h>
 
+#include "Adafruit_GFX.h"     // Библиотека обработчика графики
+#include "Adafruit_ILI9341.h" // Программные драйвера для дисплеев ILI9341
+
 #define DHTTYPE DHT22
 
 #define CO2_TX        A0
 #define CO2_RX        A1
-
-//#define SQA           A4  //(SDA) I2C
-//#define SCL           A5  //(SCK) I2C
-
-//#define OLED_RESET  4
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 #define RNF_CE_PIN    6
@@ -51,13 +50,16 @@
 #define RNF_MISO      12
 #define RNF_SCK       13
 
-#define TFT_CS        10                  // Указываем пины cs
+#define TFT_CS        2                  // Указываем пины cs
 #define TFT_DC        9                   // Указываем пины dc (A0)
 #define TFT_RST       8                   // Указываем пины reset
+#define TFT_MOSI      3           // Пин подключения вывода дисплея SDI(MOSI) SDA
+#define TFT_MISO      -1           // Пин подключения вывода дисплея SDO(MISO)
+#define TFT_CLK       4            // Пин подключения вывода дисплея SCK SCL
 
-#define BZZ_PIN       2
+#define BZZ_PIN       1 //2
 #define LED_PIN       3
-#define IR_RECV_PIN   4
+#define IR_RECV_PIN   -1
 #define DHT_PIN       5
 #define BTTN_PIN      A2
 #define LGHT_SENSOR_PIN      A3
@@ -89,14 +91,13 @@
 
 DHT dht(DHT_PIN, DHTTYPE);
 
-TFT TFTscreen = TFT(TFT_CS, TFT_DC, TFT_RST);
-
 const byte ROOM_NUMBER = ROOM_BED;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин
 const uint32_t CHANGE_STATISTIC_INTERVAL_S = 3;
 const uint32_t SET_LED_INTERVAL_S = 5;
+const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
 
 const byte NUMBER_STATISTICS = 60;
 
@@ -124,6 +125,7 @@ const int LEVEL3_CO2_ALARM = 1200;
 const int LIGHT_LEVEL_DARK = 370;
 
 const int EEPROM_ADR_INDEX_STATISTIC = 1023; //last address in eeprom for store indexStatistic
+const uint16_t HEIGHT_DISPLAY = 320;
 
 // Single radio pipe address for the 2 nodes to communicate.  Значение "трубы" передатчика и приемника ОБЯЗАНЫ быть одинаковыми.
 //const uint64_t readingPipe = 0xE8E8F0F0AALL;  // д.б. свой для каждого блока
@@ -134,16 +136,17 @@ const String IR_CODE_VENT2 = "38863bca";
 const String IR_CODE_VENT_STOP = "38863bca";
 const String IR_CODE_VENT_AUTO = "38863bca";
 
-const byte W1 = 69;
-const byte W2 = 69;
-const byte H1 = 25;
-const byte H2 = 25;
-const byte H3 = 25;
+const byte W1 = 119;
+const byte W2 = 119;
+const byte H1 = 50;
+const byte H2 = 50;
+const byte H3 = 50;
 
 elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 elapsedMillis saveStatistic_ms = (SAVE_STATISTIC_INTERVAL_S - REFRESH_SENSOR_INTERVAL_S * 3) * 1000;
 elapsedMillis changeStatistic_ms = 0;
 elapsedMillis setLed_ms = 0;
+elapsedMillis readCommandNRF_ms = 0;
 
 IRrecv irrecv(IR_RECV_PIN);
 
@@ -168,6 +171,8 @@ SoftwareSerial mySerial(CO2_TX, CO2_RX); // TX, RX сенсора
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
 
+Adafruit_ILI9341 TFTscreen = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_RST, TFT_MISO);  // Создаем объект дисплея и сообщаем библиотеке распиновку для работы с графикой
+
 void setup()
 {
   Serial.begin(9600);
@@ -176,49 +181,27 @@ void setup()
 
   dht.begin();
 
-  // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
-  // display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
-  // init done
-
-
-  TFTscreen.width(); //int16_t width(void);
-
-  TFTscreen.height(); //int16_t height(void);
-  TFTscreen.begin();
-  /*
-    Установка цвета фона TFTscreen.background ( r , g , b )
-    где, r, g и b являются значениями RGB для заданного цвета
-  */
-  TFTscreen.background(0, 0, 0);
-  /*
-    Команда установки цвета фонта TFTscreen.stroke ( r , g , b )
-    где, r, g и b являются значениями RGB для заданного цвета
-  */
-  TFTscreen.setTextSize(2);      // Устанавливаем размер шрифта
-
-  TFTscreen.setRotation(0);  // 0 - Portrait, 1 - Lanscape
-
-
   EEPROM.get(EEPROM_ADR_INDEX_STATISTIC, indexStatistic);
 
   // RF24
   radio.begin();                          // Включение модуля;
   _delay_ms(10);
   radio.enableAckPayload();                     // Allow optional ack payloads
+  //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
 
   radio.setPayloadSize(32); //18
-  radio.setChannel(ChannelNRF);            // Установка канала вещания;
+  radio.setChannel(ArRoomsChannelsNRF[ROOM_NUMBER]);
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
+  //radio.setAutoAck(0);                    // Установка режима подтверждения приема;
   radio.openWritingPipe(CentralReadingPipe);     // Активация данных для отправки
-  radio.openReadingPipe(1, ArRoomsReadingPipes[ROOM_NUMBER]);   // Активация данных для чтения
+  radio.openReadingPipe(1, RoomReadingPipe);   // Активация данных для чтения
   radio.startListening();
-//  radio.flush_tx();
-//  radio.flush_rx();
+
   radio.printDetails();
 
-  irrecv.enableIRIn(); // Start the ir receiver
+  //  irrecv.enableIRIn(); // Start the ir receiver
 
   pinMode(BZZ_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
@@ -228,7 +211,24 @@ void setup()
   Serial.println(ROOM_NUMBER);
   _delay_ms(10);
 
-  wdt_enable(WDTO_8S);
+
+  TFTscreen.width();
+  TFTscreen.height();
+  TFTscreen.begin();
+  TFTscreen.setRotation(0);  // 0 - Portrait, 1 - Lanscape
+
+  /*
+    Установка цвета фона TFTscreen.background ( r , g , b )
+    где, r, g и b являются значениями RGB для заданного цвета
+  */
+  //TFTscreen.background(0, 0, 0);
+  /*
+    Команда установки цвета фонта TFTscreen.stroke ( r , g , b )
+    где, r, g и b являются значениями RGB для заданного цвета
+  */
+  TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
+
+  //  wdt_enable(WDTO_8S);
 }
 
 void(* resetFunc) (void) = 0; // объявляем функцию reset с адресом 0
@@ -292,7 +292,7 @@ void RefreshSensorData()
     {
       Serial.println("RESET in 3 sec");
       _delay_ms(3000);
-      resetFunc(); //вызов reset
+      //// resetFunc(); //вызов reset
     }
 
     PrepareCommandNRF(RSP_INFO, 100, -100, 99, 99);
@@ -348,22 +348,22 @@ void DisplayData()
   char printout[128];
   char str_temp[5];
 
-  TFTscreen.fillRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY); //время
+  DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
 
-  TFTscreen.stroke(BLACK);
+  SetTextColor(BLACK);
 
   sprintf(printout, "%d:%02d", nrfRequest.hours, nrfRequest.minutes);
-  TFTscreen.text(printout, 5, 5);
+  PrintText(printout, 20, 15);
 
 
-  TFTscreen.fillRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK); //T out
-  TFTscreen.fillRect(1, H1 + H2 + 1, W1 - 2, H3 - 2, BLACK); //P
-  TFTscreen.stroke(ORANGE);
+  DrawRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK, true); //T out
+  DrawRect(1, H1 + H2 + 1, W1 - 2, H3 - 2, BLACK, true); //P
+  SetTextColor(ORANGE);
   dtostrf(nrfRequest.tOut, 4, 1, str_temp);
   sprintf(printout, "%s", str_temp);
-  TFTscreen.text(printout, 5, H1 + 5);
+  PrintText(printout, 15, H1 + 15);
   sprintf(printout, "%d", nrfRequest.p_v);
-  TFTscreen.text(printout, 15, H1 + H2 + 5);
+  PrintText(printout, 30, H1 + H2 + 15);
 
   unsigned int co2backColor;
   if (ppm_v < LEVEL1_CO2_ALARM)
@@ -382,18 +382,18 @@ void DisplayData()
   {
     co2backColor = BLUE;
   }
-  TFTscreen.fillRect(W1 + 1, 1, W2 - 2, H1 - 2, co2backColor); //CO2
-  TFTscreen.stroke(ORANGE);
+  DrawRect(W1 + 1, 1, W2 - 2, H1 - 2, co2backColor, true); //CO2
+  SetTextColor(ORANGE);
   sprintf(printout, "%4d", ppm_v);
 
-  TFTscreen.fillRect(W1 + 1, H1 + 1, W2 - 2, H2 - 2, BLACK); //T in
-  TFTscreen.text(printout, 75, 5);
+  DrawRect(W1 + 1, H1 + 1, W2 - 2, H2 - 2, BLACK, true); //T in
+  PrintText(printout, 140, 15);
   dtostrf(t_inn, 4, 1, str_temp);
   sprintf(printout, "%s", str_temp);
-  TFTscreen.text(printout, 75, 30);
+  PrintText(printout, 150, H1 + 15);
   sprintf(printout, "%d", h_v);
-  TFTscreen.fillRect(W1 + 1, H1 + H2 + 1, W2 - 2, H3 - 2, BLACK); //Hm
-  TFTscreen.text(printout, 85, 54);
+  DrawRect(W1 + 1, H1 + H2 + 1, W2 - 2, H3 - 2, BLACK, true); //Hm
+  PrintText(printout, 150, H1 + H2 + 15);
 }
 
 void ShowStatistic()
@@ -408,35 +408,34 @@ void ShowStatistic()
   byte val_prev;
   byte val_last;
   unsigned int colorLine;
-  byte height = 85;
-  byte bottom = 160;
+  const byte HEIGHT_GRAPH = 165;
 
-  TFTscreen.drawRect(W1 - 1, 0, 60, H1, DARK_GREAY); //CO2
-  TFTscreen.drawRect(0, H1 - 1, W1, H2, DARK_GREAY); //T out
-  TFTscreen.drawRect(0, H1 + H2 - 2, W1, H3, DARK_GREAY); //P
-  TFTscreen.drawRect(W1 - 1, H1 - 1, 60, H2, DARK_GREAY); //T in
-  TFTscreen.drawRect(W1 - 1, H1 + H2 - 2, 60, H3, DARK_GREAY); //Hm
+  DrawRect(W1 - 1, 0, 120, H1, DARK_GREAY, false); //CO2
+  DrawRect(0, H1 - 1, W1, H2, DARK_GREAY, false); //T out
+  DrawRect(0, H1 + H2 - 2, W1, H3, DARK_GREAY, false); //P
+  DrawRect(W1 - 1, H1 - 1, 120, H2, DARK_GREAY, false); //T in
+  DrawRect(W1 - 1, H1 + H2 - 2, 120, H3, DARK_GREAY, false); //Hm
 
   switch (Mode)
   {
     case 1: //T inn
-      TFTscreen.drawRect(W1 - 1, H1 - 1, 60, H2, WHITE);
+      DrawRect(W1 - 1, H1 - 1, 120, H2, WHITE, false);
       break;
     case 2: //T out
-      TFTscreen.drawRect(0, H1 - 1, W1, H2, WHITE);
+      DrawRect(0, H1 - 1, W1, H2, WHITE, false);
       break;
     //    case 3: //Влажн
-    //      TFTscreen.Rect(0, 71, 60, 160, WHITE);
+    //      TFTscreen.Rect(0, 71, 120, 160, WHITE);
     //      break;
     case 4: //CO2
-      TFTscreen.drawRect(W1 - 1, 0, 60, H1, WHITE);
+      DrawRect(W1 - 1, 0, 120, H1, WHITE, false);
       break;
     case 5: //P
-      TFTscreen.drawRect(0, H1 + H2 - 2, W1, H3, WHITE);
+      DrawRect(0, H1 + H2 - 2, W1, H3, WHITE, false);
       break;
   }
 
-  TFTscreen.fillRect(0, H1 + H2 + H3 + 1, 128, 160, BLACK);
+  DrawRect(0, H1 + H2 + H3 + 1, 240, 320 - (H1 + H2 + H3 + 1), BLACK, true);
   //  for (int nMode = 1; nMode <= 5; nMode++)
   //  {
   //    if (nMode == 3) continue; //влажность не надо
@@ -498,7 +497,7 @@ void ShowStatistic()
       break;
   }
 
-  float k = (float)height / (float)(topVal - baseVal);
+  float k = (float)HEIGHT_GRAPH / (float)(topVal - baseVal);
 
   for (byte x = 0; x < NUMBER_STATISTICS; x++)
   {
@@ -525,15 +524,15 @@ void ShowStatistic()
     {
       byte val1 = values[iprev];
       byte val2 = values[i];
-      byte y1 = bottom - (byte)(k * (val1 - baseVal));
-      byte y2 = bottom - (byte)(k * (val2 - baseVal));
-      if (y1 > (bottom - 2)) y1 = bottom - 2;
-      if (y1 < (bottom - height + 2)) y1 = bottom - height + 2;
-      if (y2 > (bottom - 2)) y2 = bottom - 2;
-      if (y2 < (bottom - height + 2)) y2 = bottom - height + 2;
-      byte x1 = 5 + (x - 1) * 2;
-      byte x2 = 5 + x * 2;
-      TFTscreen.drawLine(x1, y1, x2, y2, colorLine);
+      byte y1 = HEIGHT_GRAPH - (byte)(k * (val1 - baseVal));
+      byte y2 = HEIGHT_GRAPH - (byte)(k * (val2 - baseVal));
+      if (y1 > (HEIGHT_GRAPH - 2)) y1 = HEIGHT_GRAPH - 2;
+      if (y1 < 2) y1 = 2;
+      if (y2 > (HEIGHT_GRAPH - 2)) y2 = HEIGHT_GRAPH - 2;
+      if (y2 < 2) y2 = 2;
+      byte x1 = 5 + (x - 1) * 4;
+      byte x2 = 5 + x * 4;
+      TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - y1), x2, (HEIGHT_DISPLAY - y2), colorLine);
 
       //      if (Mode == 5)
       //      {
@@ -583,8 +582,6 @@ void ShowStatistic()
       compareVal2 = ConvertToByte(Mode, nrfRequest.p_v);
       break;
   }
-  //display.setTextSize(1);
-  //display.setCursor(110, 18);
 
 
   if (compareVal2 > compareVal1 && compareVal2 - compareVal1 > diffVal)
@@ -592,19 +589,19 @@ void ShowStatistic()
     switch (Mode)
     {
       case 1: //T inn
-        TFTscreen.fillRect(124, H2 + 1, 3, 3, WHITE);
+        DrawRect(236, H2 + 1, 3, 3, WHITE, true);
         break;
       case 2: //T out
-        TFTscreen.fillRect(W1 - 4, H2 + 1, 3, 3, WHITE);
+        DrawRect(W1 - 4, H2 + 1, 3, 3, WHITE, true);
         break;
       case 3: //Влажн
-        TFTscreen.fillRect(124, H1 + H2 + H3 - 8 , 3, 3, WHITE);
+        DrawRect(236, H1 + H2 + H3 - 8 , 3, 3, WHITE, true);
         break;
       case 4: //CO2
-        TFTscreen.fillRect(124, 3, 3, 3, WHITE);
+        DrawRect(236, 3, 3, 3, WHITE, true);
         break;
       case 5: //P
-        TFTscreen.fillRect(W1 - 4, H1 + H2, 3, 3, WHITE);
+        DrawRect(W1 - 4, H1 + H2, 3, 3, WHITE, true);
         break;
     }
   }
@@ -613,20 +610,20 @@ void ShowStatistic()
     switch (Mode)
     {
       case 1: //T inn
-        TFTscreen.fillRect(124, H1 + H2 - 7, 3, 4, WHITE);
+        DrawRect(236, H1 + H2 - 7, 3, 4, WHITE, true);
         break;
       case 2: //T out
-        TFTscreen.fillRect(W1 - 4, H1 + H2 - 7, 3, 4, WHITE);
+        DrawRect(W1 - 4, H1 + H2 - 7, 3, 4, WHITE, true);
         break;
         break;
       case 3: //Влажн
-        TFTscreen.fillRect(124, H1 + H2 + H3 - 8, 3, 4, WHITE);
+        DrawRect(236, H1 + H2 + H3 - 8, 3, 4, WHITE, true);
         break;
       case 4: //CO2
-        TFTscreen.fillRect(124, H1 - 6, 3, 4, WHITE);
+        DrawRect(236, H1 - 6, 3, 4, WHITE, true);
         break;
       case 5: //P
-        TFTscreen.fillRect(W1 - 4, H1 + H2 + H3 - 8, 3, 4, WHITE);
+        DrawRect(W1 - 4, H1 + H2 + H3 - 8, 3, 4, WHITE, true);
         break;
     }
   }
@@ -654,7 +651,7 @@ void SaveStatistic()
   EEPROM.put(NUMBER_STATISTICS * 2 + indexStatistic, ConvertToByte(3, h_v));
   EEPROM.put(NUMBER_STATISTICS * 3 + indexStatistic, ConvertToByte(4, ppm_v));
   EEPROM.put(NUMBER_STATISTICS * 4 + indexStatistic, ConvertToByte(5, nrfRequest.p_v));
-  //////Serial.println(millis());
+  
   indexStatistic = (indexStatistic < (NUMBER_STATISTICS - 1) ? indexStatistic + 1 : 0);  //доходим до NUMBER_STATISTICS и затем снова начинаем с 0
   EEPROM.put(EEPROM_ADR_INDEX_STATISTIC, indexStatistic);
 }
@@ -697,23 +694,39 @@ void ReadFromEEPROM(byte nMode)
 //Get T out, Pressure and Command
 void ReadCommandNRF()
 {
-  if (radio.available())
+  if (readCommandNRF_ms > READ_COMMAND_NRF_INTERVAL_S * 1000)
   {
-    int c = 0;
-    Serial.println("//radio.available!!");
-    while (radio.available()) // While there is data ready
+    bool done = false;
+    if ( radio.available() )
     {
-      c++;
-      if (c > 100)
-        digitalWrite(BZZ_PIN, HIGH);
-      radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
+      int cntAvl = 0;
+      Serial.println("radio.available!!");
       _delay_ms(20);
-      Serial.println("//radio.available: ");
-      Serial.println(nrfRequest.tOut);
+      while (!done) {                            // Упираемся и
+        done = radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
+        _delay_ms(20);
+        Serial.println("radio.read: ");
+        Serial.println(nrfRequest.Command);
+        Serial.println(nrfRequest.minutes);
+        Serial.println(nrfRequest.tOut);
+        _delay_ms(20);
+        cntAvl++;
+        if (cntAvl > 10)
+        {
+          Serial.println("powerDown");
+          _delay_ms(20);
+          radio.powerDown();
+          radio.powerUp();
+        }
+      }
+      if (nrfRequest.Command != RQ_NO) {
+        HandleInputNrfCommand();
+      };
+      //radio.startListening();   // Now, resume listening so we catch the next packets.
+      nrfResponse.Command == RSP_NO;
+      nrfResponse.ventSpeed = 0;
     }
-    radio.startListening();   // Now, resume listening so we catch the next packets.
-    nrfResponse.Command == RSP_NO;
-    nrfResponse.ventSpeed = 0;
+    readCommandNRF_ms = 0;
   }
 }
 
@@ -760,7 +773,7 @@ void PrepareCommandNRF(byte command, byte ventSpeed, float t_set, byte scenarioV
   nrfResponse.co2 = ppm_v;
   nrfResponse.h = h_v;
 
-  radio.flush_tx();
+  uint8_t f = radio.flush_tx();
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
 }
 
@@ -812,10 +825,43 @@ void SetLed()
 void loop()
 {
   ReadCommandNRF(); //each loop try read t_out and other info from central control
-  HandleInputNrfCommand();
+
   RefreshSensorData();
   ChangeStatistic();
   CheckIR();
   SetLed();
   wdt_reset();
+  //  delay(3000);
+}
+
+//void DrawRect(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int color, bool fill)
+//{
+//  if (fill)
+//    TFTscreen.fillRect(x1, y1, BIG_TFT ? x2 : x1 + x2, BIG_TFT ? y2 : y1 + y2, color);
+//  else
+//    TFTscreen.drawRect(x1, y1, BIG_TFT ? x2 : x1 + x2, BIG_TFT ? y2 : y1 + y2, color);
+//}
+
+void DrawRect(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int color, bool fill)
+{
+  if (fill)
+    TFTscreen.fillRect(x1, y1, x2, y2, color);
+  else
+    TFTscreen.drawRect(x1, y1, x2, y2, color);
+}
+
+void PrintText(String text, int16_t x, int16_t y)
+{
+  Serial.println("PrintText");
+  //TFTscreen.text(text, x, y);
+
+  TFTscreen.setCursor(x, y);             // Определяем координаты верхнего левого угла области вывода
+  TFTscreen.print(text);
+}
+
+void SetTextColor(int color)
+{
+  Serial.println("SetTextColor");
+  //TFTscreen.stroke(color);
+  TFTscreen.setTextColor(color);  // Определяем цвет текста для вывода на дисплей
 }
