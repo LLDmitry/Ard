@@ -157,7 +157,7 @@ float t_inn = 0.0f;
 int ppm_v = 0;
 
 byte Mode = 0;
-
+byte prevGraph[50];
 byte values[NUMBER_STATISTICS];
 byte indexStatistic = 0;
 
@@ -227,6 +227,7 @@ void setup()
     где, r, g и b являются значениями RGB для заданного цвета
   */
   TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
+  DrawRect(0, 0, 240, 320, BLACK, true);
 
   //  wdt_enable(WDTO_8S);
 }
@@ -416,6 +417,9 @@ void ShowStatistic()
   DrawRect(W1 - 1, H1 - 1, 120, H2, DARK_GREAY, false); //T in
   DrawRect(W1 - 1, H1 + H2 - 2, 120, H3, DARK_GREAY, false); //Hm
 
+  //hide prev graph
+  HidePrevGraph();
+
   switch (Mode)
   {
     case 1: //T inn
@@ -434,11 +438,6 @@ void ShowStatistic()
       DrawRect(0, H1 + H2 - 2, W1, H3, WHITE, false);
       break;
   }
-
-  DrawRect(0, H1 + H2 + H3 + 1, 240, 320 - (H1 + H2 + H3 + 1), BLACK, true);
-  //  for (int nMode = 1; nMode <= 5; nMode++)
-  //  {
-  //    if (nMode == 3) continue; //влажность не надо
 
   ReadFromEEPROM(Mode);  //into values[]
 
@@ -515,11 +514,6 @@ void ShowStatistic()
     {
       val_last = values[i];
     }
-    //Serial.println(values[i]);
-    ////display.drawLine(x * 5, bottom, x * 5, bottom - k * (float)(values[i] - baseVal), WHITE);
-    //display.display();
-    // Serial.print("Line= ");
-    // Serial.println(bottom - ((float)GetVal(mode, i) - (float)minVal)/ k  - 3);
     if (x > 0)
     {
       byte val1 = values[iprev];
@@ -533,29 +527,16 @@ void ShowStatistic()
       byte x1 = 5 + (x - 1) * 4;
       byte x2 = 5 + x * 4;
       TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - y1), x2, (HEIGHT_DISPLAY - y2), colorLine);
-
-      //      if (Mode == 5)
-      //      {
-      //        if (x > 40) delay(1000);
-      //        Serial.print("x= ");
-      //        Serial.println(x);
-      //        Serial.print("i= ");
-      //        Serial.println(i);
-      //        Serial.print("val1= ");
-      //        Serial.println(values[i - 1]);
-      //        Serial.print("val2= ");
-      //        Serial.println(values[i]);
-      //        //        Serial.print("y1=   ");
-      //        //        Serial.println(y1);
-      //        //        Serial.print("y2=   ");
-      //        //        Serial.println(y2);
-      //      }
+      if (x == 1) prevGraph[0] = y1;
+      prevGraph[x] = y2;
     }
     iprev = i;
   }
-  //  }
+  ShowChangeMark(val_last, val_prev);
+}
 
-
+void ShowChangeMark(byte val_last, byte val_prev)
+{
   byte compareVal1 = saveStatistic_ms > SAVE_STATISTIC_INTERVAL_S / 2 ? val_last : val_prev;
   byte compareVal2;
   byte diffVal;
@@ -582,7 +563,6 @@ void ShowStatistic()
       compareVal2 = ConvertToByte(Mode, nrfRequest.p_v);
       break;
   }
-
 
   if (compareVal2 > compareVal1 && compareVal2 - compareVal1 > diffVal)
   {
@@ -629,6 +609,18 @@ void ShowStatistic()
   }
 }
 
+void HidePrevGraph()
+{
+  //DrawRect(0, H1 + H2 + H3 + 1, 240, 320 - (H1 + H2 + H3 + 1), BLACK, true);
+
+  for (byte x = 1; x <= NUMBER_STATISTICS; x++)
+  {
+    byte x1 = 5 + (x - 1) * 4;
+    byte x2 = 5 + x * 4;
+    TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - prevGraph[x - 1]), x2, (HEIGHT_DISPLAY - prevGraph[x]), BLACK);
+  }
+}
+
 void SaveStatistic()
 {
   //temperatures[indexStatistic] = t_inn * 10;  //197 вместо 19.7, чтобы хранить integer
@@ -651,7 +643,7 @@ void SaveStatistic()
   EEPROM.put(NUMBER_STATISTICS * 2 + indexStatistic, ConvertToByte(3, h_v));
   EEPROM.put(NUMBER_STATISTICS * 3 + indexStatistic, ConvertToByte(4, ppm_v));
   EEPROM.put(NUMBER_STATISTICS * 4 + indexStatistic, ConvertToByte(5, nrfRequest.p_v));
-  
+
   indexStatistic = (indexStatistic < (NUMBER_STATISTICS - 1) ? indexStatistic + 1 : 0);  //доходим до NUMBER_STATISTICS и затем снова начинаем с 0
   EEPROM.put(EEPROM_ADR_INDEX_STATISTIC, indexStatistic);
 }
