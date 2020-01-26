@@ -31,7 +31,6 @@
 #include <avr/power.h>
 #include <util/delay.h>
 
-
 //#define OLED_RESET 4
 #define U_220_PIN 5       // контроль наличия 220в, с конденсатором, чтобы не реагировать на импульсы пропадания
 #define ONE_WIRE_PIN 5    // DS18b20
@@ -287,6 +286,11 @@ NRFRequest nrfRequest;
 NRFResponse nrfResponse;
 boolean nrfCommandProcessing = false; //true when received nrf command
 
+//ESP https://istarik.ru/blog/esp8266/29.html
+HardwareSerial & ESPport = Serial1; //ESP подключите к Serial1 (18, 19), скорость можно сделать 57600
+#define BUFFER_SIZE 128
+char esp_buffer[BUFFER_SIZE];
+String vklotkl;
 
 void setup()
 {
@@ -369,6 +373,21 @@ void setup()
   //  setTime(22, 35, 0, 5, 2, 2019);
   //  //Применяем:
   //  RTC.set(now());
+
+  //ESP
+  //Serial.begin(9600); // Терминал
+  ESPport.begin(115200); // ESP8266
+  clearSerialBuffer();
+
+  GetResponse("AT+RST", 3400); // перезагрузка ESP
+  GetResponse("AT+CWMODE=1", 300); // режим клиента
+  connectWiFi("myrouter", "parolparol"); // подключаемся к домашнему роутеру (имя точки, пароль)
+  GetResponse("AT+CIPMODE=0", 300); // сквозной режим передачи данных.
+  GetResponse("AT+CIPMUX=1", 300); // multiple connection.
+
+  GetResponse("AT+CIPSERVER=1,88", 300); // запускаем ТСР-сервер на 88-ом порту
+  GetResponse("AT+CIPSTO=2", 300); // таймаут сервера 2 сек
+  GetResponse("AT+CIFSR", 300); // узнаём адрес
 
   Serial.println("Setup done");
 
@@ -1926,9 +1945,125 @@ void VentControl()
 //  InformCall(CI_NO_220);
 //}
 
+void EspProcessing()
+{
+  int ch_id, packet_len;
+  char *pb;
+  ESPport.readBytesUntil('\n', esp_buffer, BUFFER_SIZE);
+
+  if (strncmp(esp_buffer, "+IPD,", 5) == 0)
+  {
+    sscanf(esp_buffer + 5, "%d,%d", &ch_id, &packet_len);
+    if (packet_len > 0)
+    {
+      pb = esp_buffer + 5;
+      while (*pb != ':') pb++;
+      pb++;
+      if ((strncmp(pb, "GET / ", 6) == 0) || (strncmp(pb, "GET /?", 6) == 0))
+      {
+        clearSerialBuffer();
+
+        //        if(ledState == LOW)
+        //          {
+        //            ledState = HIGH;
+        //            vklotkl = "VKL";
+        //          }
+        //
+        //        else
+        //          {
+        //            ledState = LOW;
+        //            vklotkl = "OTKL";
+        //          }
+
+        //        digitalWrite(ledPin, ledState);
+        otvet_klienty(ch_id);
+      }
+    }
+  }
+  clearBuffer();
+}
+//////////////////////формирование ответа клиенту////////////////////
+void otvet_klienty(int ch_id)
+{
+  String Header;
+
+  Header =  "HTTP/1.1 200 OK\r\n";
+  Header += "Content-Type: text/html\r\n";
+  Header += "Connection: close\r\n";
+
+  String Content;
+
+  Content = "<body><form action='' method='GET'><input type='submit' value='VKL/OTKL'> " + vklotkl;
+  Content += "</form></body></html>";
+
+  Header += "Content-Length: ";
+  Header += (int)(Content.length());
+  Header += "\r\n\r\n";
+
+  ESPport.print("AT+CIPSEND="); // ответ клиенту
+  ESPport.print(ch_id);
+  ESPport.print(",");
+  ESPport.println(Header.length() + Content.length());
+  delay(20);
+
+  if (ESPport.find(">"))
+  {
+    ESPport.print(Header);
+    ESPport.print(Content);
+    delay(200);
+  }
+}
+/////////////////////отправка АТ-команд/////////////////////
+String GetResponse(String AT_Command, int wait)
+{
+  String tmpData;
+
+  ESPport.println(AT_Command);
+  delay(wait);
+  while (ESPport.available() > 0 )
+  {
+    char c = ESPport.read();
+    tmpData += c;
+
+    if ( tmpData.indexOf(AT_Command) > -1 )
+      tmpData = "";
+    else
+      tmpData.trim();
+
+  }
+  return tmpData;
+}
+//////////////////////очистка ESPport////////////////////
+void clearSerialBuffer(void)
+{
+  while ( ESPport.available() > 0 )
+  {
+    ESPport.read();
+  }
+}
+////////////////////очистка буфера////////////////////////
+void clearBuffer(void) {
+  for (int i = 0; i < BUFFER_SIZE; i++ )
+  {
+    esp_buffer[i] = 0;
+  }
+}
+////////////////////подключение к wifi/////////////////////
+boolean connectWiFi(String NetworkSSID, String NetworkPASS)
+{
+  String cmd = "AT+CWJAP=\"";
+  cmd += NetworkSSID;
+  cmd += "\",\"";
+  cmd += NetworkPASS;
+  cmd += "\"";
+
+  ESPport.println(cmd);
+  delay(6500);
+}
+
+
 void loop()
 {
-
   //  GetSoftSerialData();
   //  CheckSoftwareSerialData();
   //  WorkflowGSM();
@@ -1942,6 +2077,7 @@ void loop()
   //();
   //  ReadCommandNRF
   VentControl();
+  EspProcessing();
   //  //NagrevControl();
   //  Check220();
   //  DisplayData(0);
