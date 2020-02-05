@@ -4,21 +4,6 @@
 // move nrf to soft spi http://forum.amperka.ru/threads/nrf24l-spi-tft-display.7748/   https://forum.arduino.cc/index.php?topic=545575.0
 // http://forum.amperka.ru/threads/nrf24l01-%D0%BF%D0%BE%D0%B1%D0%B5%D0%B6%D0%B4%D0%B0%D0%B5%D0%BC-%D0%BC%D0%BE%D0%B4%D1%83%D0%BB%D1%8C.3205/page-36
 //TFT: https://www.arduino.cc/en/Guide/TFT
-// TFT 160x128
-// GND   GND
-// VCC   +5В
-// RESET   8
-// A0/RS  9
-// SDA   11
-// SCK   13
-// CS  10
-
-//NRF24L01
-//MOSI 11 (51 для Arduino Mega)
-//SCK 13 (52 для Arduino Mega)
-//MISO 12 (50 для Arduino Mega)
-//CE и CSN подключаются к любому  цифровому пину Ардуино.
-//Питание – на 3,3 В
 
 #include <NrfCommands.h>
 #include "SoftwareSerial.h"
@@ -46,23 +31,21 @@
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 #define RNF_CE_PIN    6
 #define RNF_CSN_PIN   7
-#define RNF_MOSI      11  //SDA
+#define RNF_MOSI      11
 #define RNF_MISO      12
 #define RNF_SCK       13
 
-#define TFT_CS        2                  // Указываем пины cs
-#define TFT_DC        9                   // Указываем пины dc (A0)
-#define TFT_RST       8                   // Указываем пины reset
-#define TFT_MOSI      3           // Пин подключения вывода дисплея SDI(MOSI) SDA
+#define TFT_CS        2            // Указываем пины cs
+#define TFT_DC        4            // Указываем пины dc (A0)
+#define TFT_RST       3            // Указываем пины reset
+#define TFT_MOSI      5            // Пин подключения вывода дисплея SDI(MOSI) SDA
 #define TFT_MISO      -1           // Пин подключения вывода дисплея SDO(MISO)
-#define TFT_CLK       4            // Пин подключения вывода дисплея SCK SCL
+#define TFT_CLK       6            // Пин подключения вывода дисплея SCK SCL
 
-#define BZZ_PIN       1 //2
-#define LED_PIN       3
-#define IR_RECV_PIN   -1
+#define BZZ_PIN       1
 #define DHT_PIN       5
 #define BTTN_PIN      A2
-#define LGHT_SENSOR_PIN      A3
+#define IR_RECV_PIN   8
 
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
 
@@ -204,8 +187,8 @@ void setup()
   //  irrecv.enableIRIn(); // Start the ir receiver
 
   pinMode(BZZ_PIN, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
-  pinMode( LGHT_SENSOR_PIN, INPUT);
+  //  pinMode(LED_PIN, OUTPUT);
+  pinMode(BTTN_PIN, INPUT);
 
   Serial.print("ROOM_NUMBER=");
   Serial.println(ROOM_NUMBER);
@@ -804,15 +787,15 @@ void CheckIR()
   }
 }
 
-void SetLed()
-{
-  if (setLed_ms > SET_LED_INTERVAL_S * 1000)
-  {
-    int lightLevel = analogRead(LGHT_SENSOR_PIN);
-    digitalWrite(LED_PIN, (lightLevel > LIGHT_LEVEL_DARK));
-    setLed_ms = 0;
-  }
-}
+//void SetLed()
+//{
+//  if (setLed_ms > SET_LED_INTERVAL_S * 1000)
+//  {
+//    int lightLevel = analogRead(LGHT_SENSOR_PIN);
+//    digitalWrite(LED_PIN, (lightLevel > LIGHT_LEVEL_DARK));
+//    setLed_ms = 0;
+//  }
+//}
 
 void loop()
 {
@@ -821,7 +804,7 @@ void loop()
   RefreshSensorData();
   ChangeStatistic();
   CheckIR();
-  SetLed();
+  //  SetLed();
   wdt_reset();
   //  delay(3000);
 }
