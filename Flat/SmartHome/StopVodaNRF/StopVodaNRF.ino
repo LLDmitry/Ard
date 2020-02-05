@@ -17,7 +17,7 @@
 #define BTN_PIN       3
 #define SOLENOID_PIN  8
 #define BUZZ_PIN      4
-#define VODA_PIN      2
+#define VODA_PIN      2     //300Kom +5v
 #define ONE_WIRE_PIN  5    // DS18b20
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
@@ -35,6 +35,7 @@ const unsigned long MANUAL_CLOSE_DURATION_SEC = 10; //10s
 const unsigned long CHECK_VODA_PERIOD_SEC = 3;
 const unsigned long ALARM_INTERVAL_SEC = 2;
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
+const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
 
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
 
@@ -51,6 +52,7 @@ elapsedMillis manualOpenTime_ms;
 elapsedMillis manualCloseTime_ms;
 elapsedMillis alarmInterval_ms;
 elapsedMillis lastRefreshSensor_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
+elapsedMillis readCommandNRF_ms = 0;
 
 //byte h_v = 0;
 float t_inn = 0.0f;
@@ -75,8 +77,8 @@ void setup()
   // immediately disable watchdog timer so set will not get interrupted
   wdt_disable();
 
-  pinMode(VODA_PIN, INPUT_PULLUP);
-  //pinMode(VODA_PIN, INPUT);
+  //pinMode(VODA_PIN, INPUT_PULLUP);
+  pinMode(VODA_PIN, INPUT);
   pinMode(BTN_PIN, INPUT_PULLUP);
   pinMode(SOLENOID_PIN, OUTPUT);
   pinMode(BUZZ_PIN, OUTPUT);
@@ -147,6 +149,7 @@ void RefreshSensorData()
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   if (lastRefreshSensor_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
   {
+    Serial.println("RefreshSensorData");
     //    h_v = dht.readHumidity();
     //    t_inn = dht.readTemperature();
     //t_inn = millis() / 1000;
@@ -155,6 +158,8 @@ void RefreshSensorData()
     t_inn = sensors.getTempC(InnTempDeviceAddress);
     t_cold = sensors.getTempC(ColdVodaTempDeviceAddress);
     t_hot = sensors.getTempC(HotVodaTempDeviceAddress);
+
+    Serial.println(t_hot);
 
     PrepareCommandNRF();
     lastRefreshSensor_ms = 0;
@@ -268,22 +273,58 @@ void AlarmControl()
 }
 
 //Get T out, Pressure and Command
+//void ReadCommandNRF()
+//{
+//  if (radio.available())
+//  {
+//    Serial.println("radio.available!!");
+//    //radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
+//    while (radio.available()) // While there is data ready
+//    {
+//      radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
+//      delay(20);
+//      Serial.println("radio.available: ");
+//      Serial.println(nrfRequest.tOut);
+//    }
+//    radio.startListening();   // Now, resume listening so we catch the next packets.
+//    nrfResponse.Command == RSP_NO;
+//    nrfResponse.ventSpeed = 0;
+//  }
+//}
+
+//Get Command
 void ReadCommandNRF()
 {
-  if (radio.available())
+  if (readCommandNRF_ms > READ_COMMAND_NRF_INTERVAL_S * 1000)
   {
-    Serial.println("radio.available!!");
-    //radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
-    while (radio.available()) // While there is data ready
+    bool done = false;
+    if (radio.available())
     {
-      radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
-      delay(20);
-      Serial.println("radio.available: ");
-      Serial.println(nrfRequest.tOut);
+      int cntAvl = 0;
+      Serial.println("radio.available!!");
+      while (!done) {
+        done = radio.read(&nrfRequest, sizeof(nrfRequest));
+        delay(20);
+        Serial.println("radio.available: ");
+        Serial.println(nrfRequest.tOut);
+
+        cntAvl++;
+        if (cntAvl > 10)
+        {
+          Serial.println("powerDown");
+          _delay_ms(20);
+          radio.powerDown();
+          radio.powerUp();
+        }
+//        if (nrfRequest.Command != RQ_NO) {
+//          HandleInputNrfCommand(); //closeVoda?
+//        };
+
+        nrfResponse.Command == RSP_NO;
+        nrfResponse.tOut = 99.9;
+      }
     }
-    radio.startListening();   // Now, resume listening so we catch the next packets.
-    nrfResponse.Command == RSP_NO;
-    nrfResponse.ventSpeed = 0;
+    readCommandNRF_ms = 0;
   }
 }
 
