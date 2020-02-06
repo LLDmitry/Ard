@@ -29,23 +29,23 @@
 #define CO2_RX        A1
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
-#define RNF_CE_PIN    6
-#define RNF_CSN_PIN   7
+#define RNF_CE_PIN    7
+#define RNF_CSN_PIN   8
 #define RNF_MOSI      11
 #define RNF_MISO      12
 #define RNF_SCK       13
 
-#define TFT_CS        2            // Указываем пины cs
-#define TFT_DC        4            // Указываем пины dc (A0)
-#define TFT_RST       3            // Указываем пины reset
-#define TFT_MOSI      5            // Пин подключения вывода дисплея SDI(MOSI) SDA
+#define TFT_CS        1            // Указываем пины cs
+#define TFT_DC        2            // Указываем пины dc (A0)
+#define TFT_RST       0            // Указываем пины reset
+#define TFT_MOSI      3            // Пин подключения вывода дисплея SDI(MOSI) SDA
 #define TFT_MISO      -1           // Пин подключения вывода дисплея SDO(MISO)
-#define TFT_CLK       6            // Пин подключения вывода дисплея SCK SCL
+#define TFT_CLK       4            // Пин подключения вывода дисплея SCK SCL
 
-#define BZZ_PIN       1
-#define DHT_PIN       5
-#define BTTN_PIN      A2
-#define IR_RECV_PIN   8
+#define BZZ_PIN       9
+#define DHT_PIN       10
+#define BTTN_PIN      5
+#define IR_RECV_PIN   6
 
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
 
