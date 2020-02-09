@@ -19,6 +19,7 @@
 #include <avr/sleep.h>
 #include <avr/wdt.h>
 #include <util/delay.h>
+#include <IRremote.h>
 
 #include "Adafruit_GFX.h"     // Библиотека обработчика графики
 #include "Adafruit_ILI9341.h" // Программные драйвера для дисплеев ILI9341
@@ -29,23 +30,25 @@
 #define CO2_RX        A1
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
-#define RNF_CE_PIN    7
-#define RNF_CSN_PIN   8
+#define RNF_CE_PIN    8
+#define RNF_CSN_PIN   10
 #define RNF_MOSI      11
 #define RNF_MISO      12
 #define RNF_SCK       13
 
-#define TFT_CS        1            // Указываем пины cs
-#define TFT_DC        2            // Указываем пины dc (A0)
-#define TFT_RST       0            // Указываем пины reset
-#define TFT_MOSI      3            // Пин подключения вывода дисплея SDI(MOSI) SDA
-#define TFT_MISO      -1           // Пин подключения вывода дисплея SDO(MISO)
-#define TFT_CLK       4            // Пин подключения вывода дисплея SCK SCL
+#define TFT_CS        2            // Указываем пины cs
+#define TFT_RST       3            // Указываем пины reset
+#define TFT_DC        4            // Указываем пины dc (A0)
+#define TFT_MOSI      A5            // Пин подключения вывода дисплея SDI(MOSI) SDA
+#define TFT_CLK       A3            // Пин подключения вывода дисплея SCK SCL
+#define TFT_MISO      -1           // Пин подключения вывода дисплея SDO(MISO)s
 
 #define BZZ_PIN       9
-#define DHT_PIN       10
-#define BTTN_PIN      5
-#define IR_RECV_PIN   6
+#define DHT_PIN       7
+#define BTTN_PIN      -1 //5
+#define IR_RECV_PIN   -1 //6
+#define LGHT_SENSOR_PIN    A4
+#define LED_PIN       A2
 
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
 
@@ -76,7 +79,7 @@ DHT dht(DHT_PIN, DHTTYPE);
 
 const byte ROOM_NUMBER = ROOM_BED;
 
-const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
+const uint32_t REFRESH_SENSOR_INTERVAL_S = 10;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин
 const uint32_t CHANGE_STATISTIC_INTERVAL_S = 3;
 const uint32_t SET_LED_INTERVAL_S = 5;
@@ -184,10 +187,10 @@ void setup()
 
   radio.printDetails();
 
-  //  irrecv.enableIRIn(); // Start the ir receiver
+  irrecv.enableIRIn(); // Start the ir receiver
 
   pinMode(BZZ_PIN, OUTPUT);
-  //  pinMode(LED_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
   pinMode(BTTN_PIN, INPUT);
 
   Serial.print("ROOM_NUMBER=");
@@ -787,15 +790,15 @@ void CheckIR()
   }
 }
 
-//void SetLed()
-//{
-//  if (setLed_ms > SET_LED_INTERVAL_S * 1000)
-//  {
-//    int lightLevel = analogRead(LGHT_SENSOR_PIN);
-//    digitalWrite(LED_PIN, (lightLevel > LIGHT_LEVEL_DARK));
-//    setLed_ms = 0;
-//  }
-//}
+void SetLed()
+{
+  if (setLed_ms > SET_LED_INTERVAL_S * 1000)
+  {
+    int lightLevel = analogRead(LGHT_SENSOR_PIN);
+    digitalWrite(LED_PIN, (lightLevel > LIGHT_LEVEL_DARK));
+    setLed_ms = 0;
+  }
+}
 
 void loop()
 {
@@ -803,19 +806,10 @@ void loop()
 
   RefreshSensorData();
   ChangeStatistic();
-  CheckIR();
-  //  SetLed();
+  //CheckIR();
+  //SetLed();
   wdt_reset();
-  //  delay(3000);
 }
-
-//void DrawRect(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int color, bool fill)
-//{
-//  if (fill)
-//    TFTscreen.fillRect(x1, y1, BIG_TFT ? x2 : x1 + x2, BIG_TFT ? y2 : y1 + y2, color);
-//  else
-//    TFTscreen.drawRect(x1, y1, BIG_TFT ? x2 : x1 + x2, BIG_TFT ? y2 : y1 + y2, color);
-//}
 
 void DrawRect(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int color, bool fill)
 {
