@@ -142,6 +142,14 @@ byte h_v = 0;
 float t_inn = 0.0f;
 int ppm_v = 0;
 
+float prev_tOut = 0.0f;
+float prev_t_inn = 0.0f;
+byte prev_h_v = 0;
+int prev_ppm_v = 0;
+int prev_p_v = 0;
+byte prev_hours = 0;
+byte prev_minutes = 0;
+
 byte Mode = 0;
 byte prevGraph[50];
 byte values[NUMBER_STATISTICS];
@@ -335,52 +343,77 @@ void DisplayData()
   char printout[128];
   char str_temp[5];
 
-  DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
+  if (nrfRequest.hours != prev_hours || nrfRequest.minutes != prev_minutes)
+  {
+    DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
+    SetTextColor(BLACK);
+    sprintf(printout, "%d:%02d", nrfRequest.hours, nrfRequest.minutes);
+    PrintText(printout, 20, 15);
+    prev_hours = nrfRequest.hours;
+    prev_minutes = nrfRequest.minutes;
+  }    
 
-  SetTextColor(BLACK);
-
-  sprintf(printout, "%d:%02d", nrfRequest.hours, nrfRequest.minutes);
-  PrintText(printout, 20, 15);
-
-
-  DrawRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK, true); //T out
-  DrawRect(1, H1 + H2 + 1, W1 - 2, H3 - 2, BLACK, true); //P
   SetTextColor(ORANGE);
-  dtostrf(nrfRequest.tOut, 4, 1, str_temp);
-  sprintf(printout, "%s", str_temp);
-  PrintText(printout, 15, H1 + 15);
-  sprintf(printout, "%d", nrfRequest.p_v);
-  PrintText(printout, 30, H1 + H2 + 15);
+  
+  if (nrfRequest.tOut != prev_tOut)
+  {
+    DrawRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK, true); //T out
+    dtostrf(nrfRequest.tOut, 4, 1, str_temp);
+    sprintf(printout, "%s", str_temp);
+    PrintText(printout, 15, H1 + 15);
+    prev_tOut = nrfRequest.tOut;
+  }
 
-  unsigned int co2backColor;
-  if (ppm_v < LEVEL1_CO2_ALARM)
+  if (nrfRequest.p_v != prev_p_v)
   {
-    co2backColor = MAROON;
+    DrawRect(1, H1 + H2 + 1, W1 - 2, H3 - 2, BLACK, true); //P
+    sprintf(printout, "%d", nrfRequest.p_v);
+    PrintText(printout, 30, H1 + H2 + 15);
+    prev_p_v = nrfRequest.p_v;
   }
-  else if (ppm_v < LEVEL2_CO2_ALARM)
-  {
-    co2backColor = 0x022F;
-  }
-  else if (ppm_v < LEVEL3_CO2_ALARM)
-  {
-    co2backColor = 0x012F;
-  }
-  else
-  {
-    co2backColor = BLUE;
-  }
-  DrawRect(W1 + 1, 1, W2 - 2, H1 - 2, co2backColor, true); //CO2
-  SetTextColor(ORANGE);
-  sprintf(printout, "%4d", ppm_v);
 
-  DrawRect(W1 + 1, H1 + 1, W2 - 2, H2 - 2, BLACK, true); //T in
-  PrintText(printout, 140, 15);
-  dtostrf(t_inn, 4, 1, str_temp);
-  sprintf(printout, "%s", str_temp);
-  PrintText(printout, 150, H1 + 15);
-  sprintf(printout, "%d", h_v);
-  DrawRect(W1 + 1, H1 + H2 + 1, W2 - 2, H3 - 2, BLACK, true); //Hm
-  PrintText(printout, 150, H1 + H2 + 15);
+  if (ppm_v != prev_ppm_v)
+  {
+    unsigned int co2backColor;
+    if (ppm_v < LEVEL1_CO2_ALARM)
+    {
+      co2backColor = MAROON;
+    }
+    else if (ppm_v < LEVEL2_CO2_ALARM)
+    {
+      co2backColor = 0x022F;
+    }
+    else if (ppm_v < LEVEL3_CO2_ALARM)
+    {
+      co2backColor = 0x012F;
+    }
+    else
+    {
+      co2backColor = BLUE;
+    }
+    DrawRect(W1 + 1, 1, W2 - 2, H1 - 2, co2backColor, true); //CO2
+    SetTextColor(ORANGE);
+    sprintf(printout, "%4d", ppm_v);
+    PrintText(printout, 140, 15);
+    prev_ppm_v = ppm_v;
+  }
+
+  if (t_inn != prev_t_inn)
+  {
+    DrawRect(W1 + 1, H1 + 1, W2 - 2, H2 - 2, BLACK, true); //T in
+    dtostrf(t_inn, 4, 1, str_temp);
+    sprintf(printout, "%s", str_temp);
+    PrintText(printout, 150, H1 + 15);    
+    prev_t_inn = t_inn;
+  }
+
+  if (h_v != prev_h_v)
+  {
+    DrawRect(W1 + 1, H1 + H2 + 1, W2 - 2, H3 - 2, BLACK, true); //Hm
+    sprintf(printout, "%d", h_v);    
+    PrintText(printout, 150, H1 + H2 + 15);
+    prev_h_v = h_v;
+  }
 }
 
 void ShowStatistic()
