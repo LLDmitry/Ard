@@ -129,7 +129,11 @@ void VodaControl(int typeControl) //0 - auto check, 1-short click, 2-long click
 
 void switchSolenoid()
 {
-  digitalWrite(SOLENOID_PIN, SOLENOID_NORMAL_OPENED ? closeVoda : !closeVoda);  
+  if (closeVoda)
+    Serial.println("closeVoda");
+  else
+    Serial.println("openVoda");
+  digitalWrite(SOLENOID_PIN, SOLENOID_NORMAL_OPENED ? !closeVoda : closeVoda);
 }
 
 //average voda for 3 last measures
