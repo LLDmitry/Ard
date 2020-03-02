@@ -2,7 +2,7 @@
 #include "sav_button.h" // Библиотека работы с кнопками
 #include <elapsedMillis.h>
 //#include "DHT.h"
-#include <Arduino.h>
+//#include <Arduino.h>
 #include <avr/wdt.h>
 
 #define DHT_PIN       6

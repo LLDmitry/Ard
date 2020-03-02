@@ -77,9 +77,9 @@
 
 DHT dht(DHT_PIN, DHTTYPE);
 
-const byte ROOM_NUMBER = ROOM_BED;
+const byte ROOM_NUMBER = ROOM_GOST;
 
-const uint32_t REFRESH_SENSOR_INTERVAL_S = 10;  //1 мин
+const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин
 const uint32_t CHANGE_STATISTIC_INTERVAL_S = 3;
 const uint32_t SET_LED_INTERVAL_S = 5;
@@ -149,6 +149,7 @@ int prev_ppm_v = 0;
 int prev_p_v = 0;
 byte prev_hours = 0;
 byte prev_minutes = 0;
+unsigned int prev_co2backColor;
 
 byte Mode = 0;
 byte prevGraph[50];
@@ -222,6 +223,7 @@ void setup()
   */
   TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   DrawRect(0, 0, 240, 320, BLACK, true);
+  //DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
 
   //  wdt_enable(WDTO_8S);
 }
@@ -287,7 +289,7 @@ void RefreshSensorData()
     {
       Serial.println("RESET in 3 sec");
       _delay_ms(3000);
-      //// resetFunc(); //вызов reset
+      resetFunc(); //вызов reset
     }
 
     PrepareCommandNRF(RSP_INFO, 100, -100, 99, 99);
@@ -343,30 +345,48 @@ void DisplayData()
   char printout[128];
   char str_temp[5];
 
-  if (nrfRequest.hours != prev_hours || nrfRequest.minutes != prev_minutes)
-  {
-    DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
-    SetTextColor(BLACK);
-    sprintf(printout, "%d:%02d", nrfRequest.hours, nrfRequest.minutes);
-    PrintText(printout, 20, 15);
-    prev_hours = nrfRequest.hours;
-    prev_minutes = nrfRequest.minutes;
-  }    
+  //  if (nrfRequest.hours != prev_hours || nrfRequest.minutes != prev_minutes)
+  //  {
+  //    //DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
+  //    SetTextColor(DARK_GREAY);
+  //    sprintf(printout, "%d:%02d", prev_hours, prev_minutes);
+  //    PrintText(printout, 20, 15);
+  //
+  //    SetTextColor(BLACK);
+  //    sprintf(printout, "%d:%02d", nrfRequest.hours, nrfRequest.minutes);
+  //    PrintText(printout, 20, 15);
+  //    prev_hours = nrfRequest.hours;
+  //    prev_minutes = nrfRequest.minutes;
+  //  }
 
-  SetTextColor(ORANGE);
-  
+
+
   if (nrfRequest.tOut != prev_tOut)
   {
-    DrawRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK, true); //T out
+    TFTscreen.setTextSize(4);      // Устанавливаем размер шрифта
+    //DrawRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK, true); //T out
+    SetTextColor(BLACK);
+    dtostrf(prev_tOut, 4, 1, str_temp);
+    sprintf(printout, "%s", str_temp);
+    //    PrintText(printout, 15, H1 + 15);
+    PrintText(printout, 1, 35);
+
+    SetTextColor(ORANGE);
     dtostrf(nrfRequest.tOut, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, 15, H1 + 15);
+    //    PrintText(printout, 15, H1 + 15);
+    PrintText(printout, 1, 35);
     prev_tOut = nrfRequest.tOut;
+    TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
 
   if (nrfRequest.p_v != prev_p_v)
   {
-    DrawRect(1, H1 + H2 + 1, W1 - 2, H3 - 2, BLACK, true); //P
+    // DrawRect(1, H1 + H2 + 1, W1 - 2, H3 - 2, BLACK, true); //P
+    SetTextColor(BLACK);
+    sprintf(printout, "%d", prev_p_v);
+    PrintText(printout, 30, H1 + H2 + 15);
+    SetTextColor(ORANGE);
     sprintf(printout, "%d", nrfRequest.p_v);
     PrintText(printout, 30, H1 + H2 + 15);
     prev_p_v = nrfRequest.p_v;
@@ -391,26 +411,47 @@ void DisplayData()
     {
       co2backColor = BLUE;
     }
-    DrawRect(W1 + 1, 1, W2 - 2, H1 - 2, co2backColor, true); //CO2
+
+    if (prev_co2backColor != co2backColor)
+    {
+      DrawRect(W1 + 1, 1, W2 - 2, H1 - 2, co2backColor, true); //CO2
+    }
+    else
+    {
+      SetTextColor(co2backColor);
+      sprintf(printout, "%4d", prev_ppm_v);
+      PrintText(printout, 140, 15);
+    }
+
     SetTextColor(ORANGE);
     sprintf(printout, "%4d", ppm_v);
     PrintText(printout, 140, 15);
     prev_ppm_v = ppm_v;
+    prev_co2backColor = co2backColor;
   }
 
   if (t_inn != prev_t_inn)
   {
-    DrawRect(W1 + 1, H1 + 1, W2 - 2, H2 - 2, BLACK, true); //T in
+    // DrawRect(W1 + 1, H1 + 1, W2 - 2, H2 - 2, BLACK, true); //T in
+    SetTextColor(BLACK);
+    dtostrf(prev_t_inn, 4, 1, str_temp);
+    sprintf(printout, "%s", str_temp);
+    PrintText(printout, 150, H1 + 15);
+    SetTextColor(ORANGE);
     dtostrf(t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, 150, H1 + 15);    
+    PrintText(printout, 150, H1 + 15);
     prev_t_inn = t_inn;
   }
 
   if (h_v != prev_h_v)
   {
-    DrawRect(W1 + 1, H1 + H2 + 1, W2 - 2, H3 - 2, BLACK, true); //Hm
-    sprintf(printout, "%d", h_v);    
+    //DrawRect(W1 + 1, H1 + H2 + 1, W2 - 2, H3 - 2, BLACK, true); //Hm
+    SetTextColor(BLACK);
+    sprintf(printout, "%d", prev_h_v);
+    PrintText(printout, 150, H1 + H2 + 15);
+    SetTextColor(ORANGE);
+    sprintf(printout, "%d", h_v);
     PrintText(printout, 150, H1 + H2 + 15);
     prev_h_v = h_v;
   }
@@ -431,7 +472,8 @@ void ShowStatistic()
   const byte HEIGHT_GRAPH = 165;
 
   DrawRect(W1 - 1, 0, 120, H1, DARK_GREAY, false); //CO2
-  DrawRect(0, H1 - 1, W1, H2, DARK_GREAY, false); //T out
+  //  DrawRect(0, H1 - 1, W1, H2, DARK_GREAY, false); //T out
+  DrawRect(0, 0, W1, H1 + H2, DARK_GREAY, false); //T out
   DrawRect(0, H1 + H2 - 2, W1, H3, DARK_GREAY, false); //P
   DrawRect(W1 - 1, H1 - 1, 120, H2, DARK_GREAY, false); //T in
   DrawRect(W1 - 1, H1 + H2 - 2, 120, H3, DARK_GREAY, false); //Hm
@@ -445,7 +487,8 @@ void ShowStatistic()
       DrawRect(W1 - 1, H1 - 1, 120, H2, WHITE, false);
       break;
     case 2: //T out
-      DrawRect(0, H1 - 1, W1, H2, WHITE, false);
+      //      DrawRect(0, H1 - 1, W1, H2, WHITE, false);
+      DrawRect(0, 0, W1, H1 + H2, WHITE, false);
       break;
     //    case 3: //Влажн
     //      TFTscreen.Rect(0, 71, 120, 160, WHITE);
