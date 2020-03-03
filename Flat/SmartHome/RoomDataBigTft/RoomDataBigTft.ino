@@ -519,6 +519,11 @@ void ShowStatistic()
     {
       maxVal = val;
     }
+    if (Mode == 2)
+    {
+      Serial.print("i=" + i + " ");
+      Serial.println(val);
+    }
   }
 
 
@@ -634,7 +639,8 @@ void ShowChangeMark(byte val_last, byte val_prev)
         DrawRect(236, H2 + 1, 3, 3, WHITE, true);
         break;
       case 2: //T out
-        DrawRect(W1 - 4, H2 + 1, 3, 3, WHITE, true);
+        //DrawRect(W1 - 4, H2 + 1, 3, 3, WHITE, true);
+        DrawRect(W1 - 4, 3, 3, 3, WHITE, true);
         break;
       case 3: //Влажн
         DrawRect(236, H1 + H2 + H3 - 8 , 3, 3, WHITE, true);
