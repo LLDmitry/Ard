@@ -122,8 +122,8 @@ const String IR_CODE_VENT2 = "38863bca";
 const String IR_CODE_VENT_STOP = "38863bca";
 const String IR_CODE_VENT_AUTO = "38863bca";
 
-const byte W1 = 119;
-const byte W2 = 119;
+const byte W1 = 140;
+const byte W2 = 98;
 const byte H1 = 50;
 const byte H2 = 50;
 const byte H3 = 50;
@@ -357,11 +357,11 @@ void DisplayData()
   //  if (nrfRequest.hours != prev_hours || nrfRequest.minutes != prev_minutes)
   //  {
   //    //DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
-  //    SetTextColor(DARK_GREAY);
+  //    TFTscreen.setTextColor(DARK_GREAY);
   //    sprintf(printout, "%d:%02d", prev_hours, prev_minutes);
   //    PrintText(printout, 20, 15);
   //
-  //    SetTextColor(BLACK);
+  //    TFTscreen.setTextColor(BLACK);
   //    sprintf(printout, "%d:%02d", nrfRequest.hours, nrfRequest.minutes);
   //    PrintText(printout, 20, 15);
   //    prev_hours = nrfRequest.hours;
@@ -372,19 +372,20 @@ void DisplayData()
 
   if (nrfRequest.tOut != prev_tOut)
   {
-    TFTscreen.setTextSize(4);      // Устанавливаем размер шрифта
+    TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
     //DrawRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK, true); //T out
-    SetTextColor(BLACK);
-    dtostrf(prev_tOut, 4, 1, str_temp);
+    TFTscreen.setTextColor(BLACK);
+    dtostrf(abs(prev_tOut), 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    //    PrintText(printout, 15, H1 + 15);
-    PrintText(printout, 1, 35);
+    PrintText(printout, abs(prev_tOut) < 10.0 ? 1 : 12, 30);
 
-    SetTextColor(ORANGE);
-    dtostrf(nrfRequest.tOut, 4, 1, str_temp);
+    if (nrfRequest.tOut < 0)
+      TFTscreen.setTextColor(BLUE);
+    else
+      TFTscreen.setTextColor(ORANGE);
+    dtostrf(abs(nrfRequest.tOut), 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    //    PrintText(printout, 15, H1 + 15);
-    PrintText(printout, 1, 35);
+    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 1 : 12, 30);
     prev_tOut = nrfRequest.tOut;
     TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
@@ -392,12 +393,12 @@ void DisplayData()
   if (nrfRequest.p_v != prev_p_v)
   {
     // DrawRect(1, H1 + H2 + 1, W1 - 2, H3 - 2, BLACK, true); //P
-    SetTextColor(BLACK);
+    TFTscreen.setTextColor(BLACK);
     sprintf(printout, "%d", prev_p_v);
-    PrintText(printout, 30, H1 + H2 + 15);
-    SetTextColor(ORANGE);
+    PrintText(printout, 40, H1 + H2 + 15);
+    TFTscreen.setTextColor(CYAN);
     sprintf(printout, "%d", nrfRequest.p_v);
-    PrintText(printout, 30, H1 + H2 + 15);
+    PrintText(printout, 40, H1 + H2 + 15);
     prev_p_v = nrfRequest.p_v;
   }
 
@@ -427,14 +428,14 @@ void DisplayData()
     }
     else
     {
-      SetTextColor(co2backColor);
+      TFTscreen.setTextColor(co2backColor);
       sprintf(printout, "%4d", prev_ppm_v);
-      PrintText(printout, 140, 15);
+      PrintText(printout, prev_ppm_v < 1000 ? 145 : 155, 15);
     }
 
-    SetTextColor(ORANGE);
+    TFTscreen.setTextColor(CYAN);
     sprintf(printout, "%4d", ppm_v);
-    PrintText(printout, 140, 15);
+    PrintText(printout, ppm_v < 1000 ? 145 : 155, 15);
     prev_ppm_v = ppm_v;
     prev_co2backColor = co2backColor;
   }
@@ -442,26 +443,26 @@ void DisplayData()
   if (t_inn != prev_t_inn)
   {
     // DrawRect(W1 + 1, H1 + 1, W2 - 2, H2 - 2, BLACK, true); //T in
-    SetTextColor(BLACK);
+    TFTscreen.setTextColor(BLACK);
     dtostrf(prev_t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, 150, H1 + 15);
-    SetTextColor(ORANGE);
+    PrintText(printout, 155, H1 + 15);
+    TFTscreen.setTextColor(CYAN);
     dtostrf(t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, 150, H1 + 15);
+    PrintText(printout, 155, H1 + 15);
     prev_t_inn = t_inn;
   }
 
   if (h_v != prev_h_v)
   {
     //DrawRect(W1 + 1, H1 + H2 + 1, W2 - 2, H3 - 2, BLACK, true); //Hm
-    SetTextColor(BLACK);
+    TFTscreen.setTextColor(BLACK);
     sprintf(printout, "%d", prev_h_v);
-    PrintText(printout, 150, H1 + H2 + 15);
-    SetTextColor(ORANGE);
+    PrintText(printout, 165, H1 + H2 + 15);
+    TFTscreen.setTextColor(CYAN);
     sprintf(printout, "%d", h_v);
-    PrintText(printout, 150, H1 + H2 + 15);
+    PrintText(printout, 165, H1 + H2 + 15);
     prev_h_v = h_v;
   }
 }
@@ -537,7 +538,7 @@ void ShowStatistic()
       baseVal = topVal < 30 ? 0 : topVal - 30; //30 = 3c
       //baseVal = BASE_VAL_T_IN;
       //topVal = TOP_VAL_T_IN;
-      colorLine = BLUE;
+      colorLine = RED;
       break;
     case 2: //T out
       topVal = maxVal > 251 ? 255 : maxVal + 4;
@@ -555,14 +556,14 @@ void ShowStatistic()
     case 4: //CO2
       baseVal = BASE_VAL_CO2;
       topVal = TOP_VAL_CO2;
-      colorLine = YELLOW;
+      colorLine = BLUE;
       break;
     case 5: //P
       //      baseVal = BASE_VAL_P;
       //      topVal = TOP_VAL_P;
       topVal = maxVal > 252 ? 255 : maxVal + 3;
       baseVal = minVal < 3 ? 0 : minVal - 3;
-      colorLine = CYAN;
+      colorLine = YELLOW;
       break;
   }
 
@@ -588,8 +589,9 @@ void ShowStatistic()
     {
       byte val1 = values[iprev];
       byte val2 = values[i];
-      byte y1 = (byte)(k * (val1 - baseVal)) - HEIGHT_GRAPH;
-      byte y2 = (byte)(k * (val2 - baseVal)) - HEIGHT_GRAPH;
+      byte y1 = (byte)(k * (val1 - baseVal));
+
+      byte y2 = (byte)(k * (val2 - baseVal));
       if (y1 > (HEIGHT_GRAPH - 2)) y1 = HEIGHT_GRAPH - 2;
       if (y1 < 2) y1 = 2;
       if (y2 > (HEIGHT_GRAPH - 2)) y2 = HEIGHT_GRAPH - 2;
@@ -926,11 +928,4 @@ void PrintText(String text, int16_t x, int16_t y)
 
   TFTscreen.setCursor(x, y);             // Определяем координаты верхнего левого угла области вывода
   TFTscreen.print(text);
-}
-
-void SetTextColor(int color)
-{
-  Serial.println("SetTextColor");
-  //TFTscreen.stroke(color);
-  TFTscreen.setTextColor(color);  // Определяем цвет текста для вывода на дисплей
 }
