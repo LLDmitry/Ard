@@ -81,7 +81,7 @@ const byte ROOM_NUMBER = ROOM_GOST;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const uint32_t SAVE_STATISTIC_INTERVAL_S = 1800; //30мин
-const uint32_t CHANGE_STATISTIC_INTERVAL_S = 3;
+const uint32_t CHANGE_STATISTIC_INTERVAL_S = 5;
 const uint32_t SET_LED_INTERVAL_S = 5;
 const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
 
@@ -152,7 +152,7 @@ byte prev_minutes = 0;
 unsigned int prev_co2backColor;
 
 byte Mode = 0;
-byte prevGraph[50];
+byte prevGraph[NUMBER_STATISTICS];
 byte values[NUMBER_STATISTICS];
 byte indexStatistic = 0;
 
@@ -177,6 +177,7 @@ void setup()
   dht.begin();
 
   EEPROM.get(EEPROM_ADR_INDEX_STATISTIC, indexStatistic);
+  //indexStatistic = 5;
 
   // RF24
   radio.begin();                          // Включение модуля;
@@ -301,6 +302,10 @@ void RefreshSensorData()
     if (saveStatistic_ms > SAVE_STATISTIC_INTERVAL_S * 1000)
     {
       SaveStatistic();
+
+      Serial.print("indexStatistic2 ");
+      Serial.println(indexStatistic);
+
       //ShowStatistic();
       saveStatistic_ms = 0;
     }
@@ -314,7 +319,11 @@ void ChangeStatistic()
     Mode++;
     if (Mode == 3) Mode = 4;
     if (Mode > 5) Mode = 1;
+    Serial.print("indexStatisticA ");
+    Serial.println(indexStatistic);
     ShowStatistic();
+    Serial.print("indexStatisticB ");
+    Serial.println(indexStatistic);
     changeStatistic_ms = 0;
   }
 }
@@ -397,15 +406,15 @@ void DisplayData()
     unsigned int co2backColor;
     if (ppm_v < LEVEL1_CO2_ALARM)
     {
-      co2backColor = MAROON;
+      co2backColor = 0x022F;
     }
     else if (ppm_v < LEVEL2_CO2_ALARM)
     {
-      co2backColor = 0x022F;
+      co2backColor = 0x012F;
     }
     else if (ppm_v < LEVEL3_CO2_ALARM)
     {
-      co2backColor = 0x012F;
+      co2backColor = MAROON;
     }
     else
     {
@@ -519,13 +528,7 @@ void ShowStatistic()
     {
       maxVal = val;
     }
-    if (Mode == 2)
-    {
-      Serial.print("i=" + i + " ");
-      Serial.println(val);
-    }
   }
-
 
   switch (Mode)
   {
@@ -585,8 +588,8 @@ void ShowStatistic()
     {
       byte val1 = values[iprev];
       byte val2 = values[i];
-      byte y1 = HEIGHT_GRAPH - (byte)(k * (val1 - baseVal));
-      byte y2 = HEIGHT_GRAPH - (byte)(k * (val2 - baseVal));
+      byte y1 = (byte)(k * (val1 - baseVal)) - HEIGHT_GRAPH;
+      byte y2 = (byte)(k * (val2 - baseVal)) - HEIGHT_GRAPH;
       if (y1 > (HEIGHT_GRAPH - 2)) y1 = HEIGHT_GRAPH - 2;
       if (y1 < 2) y1 = 2;
       if (y2 > (HEIGHT_GRAPH - 2)) y2 = HEIGHT_GRAPH - 2;
@@ -599,7 +602,7 @@ void ShowStatistic()
     }
     iprev = i;
   }
-  ShowChangeMark(val_last, val_prev);
+  //ShowChangeMark(val_last, val_prev);
 }
 
 void ShowChangeMark(byte val_last, byte val_prev)
@@ -702,9 +705,15 @@ void SaveStatistic()
   //  Serial.println(h_v);
   //  Serial.println(ppm_v/10);
   //  Serial.println(p_v-520);
-  //Serial.println("EEPROM.put(indexStatistic, ConvertToByte(1, t_inn));");
-  //Serial.println(t_inn);
-  //Serial.println(ConvertToByte(1, t_inn));
+  //  Serial.println("EEPROM.put(indexStatistic, ConvertToByte(1, t_inn));");
+  //  Serial.println(t_inn);
+  //  Serial.println(ConvertToByte(1, t_inn));
+  Serial.print("indexStatistic0 ");
+  Serial.println(indexStatistic);
+
+  Serial.println("EEPROM.put(indexStatistic, ConvertToByte(4, ppm_v);");
+  Serial.println(ppm_v);
+  Serial.println(ConvertToByte(4, ppm_v));
 
   EEPROM.put(NUMBER_STATISTICS * 0 + indexStatistic, ConvertToByte(1, t_inn));
   EEPROM.put(NUMBER_STATISTICS * 1 + indexStatistic, ConvertToByte(2, nrfRequest.tOut));
@@ -712,8 +721,13 @@ void SaveStatistic()
   EEPROM.put(NUMBER_STATISTICS * 3 + indexStatistic, ConvertToByte(4, ppm_v));
   EEPROM.put(NUMBER_STATISTICS * 4 + indexStatistic, ConvertToByte(5, nrfRequest.p_v));
 
+
+
   indexStatistic = (indexStatistic < (NUMBER_STATISTICS - 1) ? indexStatistic + 1 : 0);  //доходим до NUMBER_STATISTICS и затем снова начинаем с 0
   EEPROM.put(EEPROM_ADR_INDEX_STATISTIC, indexStatistic);
+
+  Serial.print("indexStatistic1 ");
+  Serial.println(indexStatistic);
 }
 
 byte ConvertToByte(byte mode, float val)
@@ -741,13 +755,17 @@ byte ConvertToByte(byte mode, float val)
 void ReadFromEEPROM(byte nMode)
 {
   //  Serial.println("");
-  //Serial.print("ReadFromEEPROM. Mode =");
-  //Serial.println(nMode);
+  Serial.print("ReadFromEEPROM. Mode =");
+  Serial.println(nMode);
   for (byte i = 0; i < NUMBER_STATISTICS; i++)
   {
     EEPROM.get(NUMBER_STATISTICS * (nMode - 1) + i, values[i]);
-    //    if (nMode == 5)
-    //      Serial.println(values[i]);
+    if (nMode == 4)//ppm_v
+    {
+      Serial.print(i);
+      Serial.print(" ");
+      Serial.println(values[i]);
+    }
   }
 }
 
