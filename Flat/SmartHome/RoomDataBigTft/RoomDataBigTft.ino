@@ -262,6 +262,7 @@ void RefreshSensorData()
     h_v = dht.readHumidity();
     //Serial.println("readHumidity ");
     t_inn = dht.readTemperature();
+    t_inn = t_inn - 1.5;
     //Serial.println("readTemperature ");
 
     mySerial.write(cmd, 9);
@@ -282,6 +283,7 @@ void RefreshSensorData()
       unsigned int responseHigh = (unsigned int) response[2];
       unsigned int responseLow = (unsigned int) response[3];
       ppm_v = (256 * responseHigh) + responseLow;
+      if (ppm_v < 400) ppm_v = 400;
       Serial.print("co2= ");
       Serial.println(ppm_v);
     }
@@ -363,7 +365,7 @@ void DisplayData()
   //
   //    TFTscreen.setTextColor(BLACK);
   //    sprintf(printout, "%d:%02d", nrfRequest.hours, nrfRequest.minutes);
-  //    PrintText(printout, 20, 15);
+  //    PrintText(printout, 20, 15);f
   //    prev_hours = nrfRequest.hours;
   //    prev_minutes = nrfRequest.minutes;
   //  }
@@ -392,14 +394,13 @@ void DisplayData()
 
   if (nrfRequest.p_v != prev_p_v)
   {
-    // DrawRect(1, H1 + H2 + 1, W1 - 2, H3 - 2, BLACK, true); //P
     TFTscreen.setTextColor(BLACK);
     sprintf(printout, "%d", prev_p_v);
-    PrintText(printout, 40, H1 + H2 + 15);
+    PrintText(printout, 45, H1 + H2 + 13);
     TFTscreen.setTextColor(CYAN);
-    sprintf(printout, "%d", nrfRequest.p_v);
-    PrintText(printout, 40, H1 + H2 + 15);
-    prev_p_v = nrfRequest.p_v;
+    sprintf(printout, "%d", nrfRequest.p_v / 10);
+    PrintText(printout, 45, H1 + H2 + 13);
+    prev_p_v = nrfRequest.p_v / 10;
   }
 
   if (ppm_v != prev_ppm_v)
@@ -411,20 +412,20 @@ void DisplayData()
     }
     else if (ppm_v < LEVEL2_CO2_ALARM)
     {
-      co2backColor = 0x012F;
+      co2backColor = OLIVE;
     }
     else if (ppm_v < LEVEL3_CO2_ALARM)
     {
-      co2backColor = MAROON;
+      co2backColor = MAGENTA;
     }
     else
     {
-      co2backColor = BLUE;
+      co2backColor = RED;
     }
 
     if (prev_co2backColor != co2backColor)
     {
-      DrawRect(W1 + 1, 1, W2 - 2, H1 - 2, co2backColor, true); //CO2
+      DrawRect(W1 + 1, 1, W2 - 3, H1 - 2, co2backColor, true); //CO2
     }
     else
     {
@@ -446,11 +447,11 @@ void DisplayData()
     TFTscreen.setTextColor(BLACK);
     dtostrf(prev_t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, 155, H1 + 15);
+    PrintText(printout, 155, H1 + 14);
     TFTscreen.setTextColor(CYAN);
     dtostrf(t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, 155, H1 + 15);
+    PrintText(printout, 155, H1 + 14);
     prev_t_inn = t_inn;
   }
 
@@ -459,10 +460,10 @@ void DisplayData()
     //DrawRect(W1 + 1, H1 + H2 + 1, W2 - 2, H3 - 2, BLACK, true); //Hm
     TFTscreen.setTextColor(BLACK);
     sprintf(printout, "%d", prev_h_v);
-    PrintText(printout, 165, H1 + H2 + 15);
+    PrintText(printout, 170, H1 + H2 + 13);
     TFTscreen.setTextColor(CYAN);
     sprintf(printout, "%d", h_v);
-    PrintText(printout, 165, H1 + H2 + 15);
+    PrintText(printout, 170, H1 + H2 + 13);
     prev_h_v = h_v;
   }
 }
@@ -481,12 +482,11 @@ void ShowStatistic()
   unsigned int colorLine;
   const byte HEIGHT_GRAPH = 165;
 
-  DrawRect(W1 - 1, 0, 120, H1, DARK_GREAY, false); //CO2
-  //  DrawRect(0, H1 - 1, W1, H2, DARK_GREAY, false); //T out
-  DrawRect(0, 0, W1, H1 + H2, DARK_GREAY, false); //T out
+  DrawRect(W1 - 1, 0, W2, H1, DARK_GREAY, false); //CO2
+  DrawRect(0, 0, W1, H1 + H2 - 1, DARK_GREAY, false); //T out
   DrawRect(0, H1 + H2 - 2, W1, H3, DARK_GREAY, false); //P
-  DrawRect(W1 - 1, H1 - 1, 120, H2, DARK_GREAY, false); //T in
-  DrawRect(W1 - 1, H1 + H2 - 2, 120, H3, DARK_GREAY, false); //Hm
+  DrawRect(W1 - 1, H1 - 1, W2, H2, DARK_GREAY, false); //T in
+  DrawRect(W1 - 1, H1 + H2 - 2, W2, H3, DARK_GREAY, false); //Hm
 
   //hide prev graph
   HidePrevGraph();
@@ -494,17 +494,12 @@ void ShowStatistic()
   switch (Mode)
   {
     case 1: //T inn
-      DrawRect(W1 - 1, H1 - 1, 120, H2, WHITE, false);
+      DrawRect(W1 - 1, H1 - 1, W2, H2, WHITE, false);
       break;
     case 2: //T out
-      //      DrawRect(0, H1 - 1, W1, H2, WHITE, false);
-      DrawRect(0, 0, W1, H1 + H2, WHITE, false);
-      break;
-    //    case 3: //Влажн
-    //      TFTscreen.Rect(0, 71, 120, 160, WHITE);
-    //      break;
+      DrawRect(0, 0, W1, H1 + H2 - 1, WHITE, false);
     case 4: //CO2
-      DrawRect(W1 - 1, 0, 120, H1, WHITE, false);
+      DrawRect(W1 - 1, 0, W2, H1, WHITE, false);
       break;
     case 5: //P
       DrawRect(0, H1 + H2 - 2, W1, H3, WHITE, false);
@@ -518,7 +513,6 @@ void ShowStatistic()
 
   for (byte i = 0; i < NUMBER_STATISTICS; i++)
   {
-    //val = GetVal(mode, i);
     val = values[i];
 
     if (val < minVal)
@@ -536,16 +530,11 @@ void ShowStatistic()
     case 1: //T inn
       topVal = maxVal > 250 ? 255 : maxVal + 5;
       baseVal = topVal < 30 ? 0 : topVal - 30; //30 = 3c
-      //baseVal = BASE_VAL_T_IN;
-      //topVal = TOP_VAL_T_IN;
       colorLine = RED;
       break;
     case 2: //T out
       topVal = maxVal > 251 ? 255 : maxVal + 4;
-      //baseVal = topVal - 50; //50 = 13c
       baseVal = minVal < 4 ? 0 : minVal - 4;
-      //        baseVal = BASE_VAL_T_OUT;
-      //        topVal = TOP_VAL_T_OUT;
       colorLine = GREEN;
       break;
     case 3: //Влажн
@@ -559,8 +548,6 @@ void ShowStatistic()
       colorLine = BLUE;
       break;
     case 5: //P
-      //      baseVal = BASE_VAL_P;
-      //      topVal = TOP_VAL_P;
       topVal = maxVal > 252 ? 255 : maxVal + 3;
       baseVal = minVal < 3 ? 0 : minVal - 3;
       colorLine = YELLOW;
@@ -582,6 +569,7 @@ void ShowStatistic()
       val_prev = values[i];
     }
     if (x == NUMBER_STATISTICS - 1)
+
     {
       val_last = values[i];
     }
@@ -749,7 +737,7 @@ byte ConvertToByte(byte mode, float val)
       return ((byte)(val / 10));
       break;
     case 5: //P
-      return ((byte)(val - 520));
+      return ((byte)(val - 7200) / 3);
       break;
   }
 }

@@ -287,7 +287,7 @@ NRFResponse nrfResponse;
 boolean nrfCommandProcessing = false; //true when received nrf command
 
 //ESP https://istarik.ru/blog/esp8266/29.html
-HardwareSerial & ESPport = Serial1; //ESP подключите к Serial1 (18, 19), скорость можно сделать 57600
+//HardwareSerial & ESPport = Serial1; //ESP подключите к Serial1 (18, 19), скорость можно сделать 57600
 #define BUFFER_SIZE 128
 char esp_buffer[BUFFER_SIZE];
 String vklotkl;
@@ -375,19 +375,19 @@ void setup()
   //  RTC.set(now());
 
   //ESP
-  //Serial.begin(9600); // Терминал
-  ESPport.begin(115200); // ESP8266
-  clearSerialBuffer();
-
-  GetResponse("AT+RST", 3400); // перезагрузка ESP
-  GetResponse("AT+CWMODE=1", 300); // режим клиента
-  connectWiFi("myrouter", "parolparol"); // подключаемся к домашнему роутеру (имя точки, пароль)
-  GetResponse("AT+CIPMODE=0", 300); // сквозной режим передачи данных.
-  GetResponse("AT+CIPMUX=1", 300); // multiple connection.
-
-  GetResponse("AT+CIPSERVER=1,88", 300); // запускаем ТСР-сервер на 88-ом порту
-  GetResponse("AT+CIPSTO=2", 300); // таймаут сервера 2 сек
-  GetResponse("AT+CIFSR", 300); // узнаём адрес
+  ////Serial.begin(9600); // Терминал
+  //  ESPport.begin(115200); // ESP8266
+  //  clearSerialBuffer();
+  //
+  //  GetResponse("AT+RST", 3400); // перезагрузка ESP
+  //  GetResponse("AT+CWMODE=1", 300); // режим клиента
+  //  connectWiFi("myrouter", "parolparol"); // подключаемся к домашнему роутеру (имя точки, пароль)
+  //  GetResponse("AT+CIPMODE=0", 300); // сквозной режим передачи данных.
+  //  GetResponse("AT+CIPMUX=1", 300); // multiple connection.
+  //
+  //  GetResponse("AT+CIPSERVER=1,88", 300); // запускаем ТСР-сервер на 88-ом порту
+  //  GetResponse("AT+CIPSTO=2", 300); // таймаут сервера 2 сек
+  //  GetResponse("AT+CIFSR", 300); // узнаём адрес
 
   Serial.println("Setup done");
 
@@ -1808,7 +1808,7 @@ void RefreshSensorData()
 
     //    h[ROOM_GOST] = dht.readHumidity();
     //    t_inn[ROOM_GOST] = dht.readTemperature();
-    p_v = 0.0075 * bmp.readPressure();
+    p_v = 0.075 * bmp.readPressure();
 
     lastRefreshSensor_ms = 0;
   }
@@ -1945,8 +1945,9 @@ void VentControl()
 //  InformCall(CI_NO_220);
 //}
 
-void EspProcessing()
-{
+/*
+  void EspProcessing()
+  {
   int ch_id, packet_len;
   char *pb;
   ESPport.readBytesUntil('\n', esp_buffer, BUFFER_SIZE);
@@ -1981,10 +1982,10 @@ void EspProcessing()
     }
   }
   clearBuffer();
-}
-//////////////////////формирование ответа клиенту////////////////////
-void otvet_klienty(int ch_id)
-{
+  }
+  //////////////////////формирование ответа клиенту////////////////////
+  void otvet_klienty(int ch_id)
+  {
   String Header;
 
   Header =  "HTTP/1.1 200 OK\r\n";
@@ -2012,10 +2013,10 @@ void otvet_klienty(int ch_id)
     ESPport.print(Content);
     delay(200);
   }
-}
-/////////////////////отправка АТ-команд/////////////////////
-String GetResponse(String AT_Command, int wait)
-{
+  }
+  /////////////////////отправка АТ-команд/////////////////////
+  String GetResponse(String AT_Command, int wait)
+  {
   String tmpData;
 
   ESPport.println(AT_Command);
@@ -2032,25 +2033,25 @@ String GetResponse(String AT_Command, int wait)
 
   }
   return tmpData;
-}
-//////////////////////очистка ESPport////////////////////
-void clearSerialBuffer(void)
-{
+  }
+  //////////////////////очистка ESPport////////////////////
+  void clearSerialBuffer(void)
+  {
   while ( ESPport.available() > 0 )
   {
     ESPport.read();
   }
-}
-////////////////////очистка буфера////////////////////////
-void clearBuffer(void) {
+  }
+  ////////////////////очистка буфера////////////////////////
+  void clearBuffer(void) {
   for (int i = 0; i < BUFFER_SIZE; i++ )
   {
     esp_buffer[i] = 0;
   }
-}
-////////////////////подключение к wifi/////////////////////
-boolean connectWiFi(String NetworkSSID, String NetworkPASS)
-{
+  }
+  ////////////////////подключение к wifi/////////////////////
+  boolean connectWiFi(String NetworkSSID, String NetworkPASS)
+  {
   String cmd = "AT+CWJAP=\"";
   cmd += NetworkSSID;
   cmd += "\",\"";
@@ -2059,8 +2060,8 @@ boolean connectWiFi(String NetworkSSID, String NetworkPASS)
 
   ESPport.println(cmd);
   delay(6500);
-}
-
+  }
+*/
 
 void loop()
 {
@@ -2077,7 +2078,7 @@ void loop()
   //();
   //  ReadCommandNRF
   VentControl();
-  EspProcessing();
+  ////EspProcessing();
   //  //NagrevControl();
   //  Check220();
   //  DisplayData(0);
