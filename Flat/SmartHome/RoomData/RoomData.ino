@@ -366,7 +366,7 @@ void DisplayData()
   dtostrf(nrfRequest.tOut, 4, 1, str_temp);
   sprintf(printout, "%s", str_temp);
   TFTscreen.text(printout, 5, H1 + 5);
-  sprintf(printout, "%d", nrfRequest.p_v);
+  sprintf(printout, "%d", nrfRequest.p_v / 10);
   TFTscreen.text(printout, 15, H1 + H2 + 5);
 
   unsigned int co2backColor;
@@ -470,7 +470,7 @@ void ShowStatistic()
   {
     case 1: //T inn -5.0 from real T
       topVal = maxVal > 250 ? 255 : maxVal + 5;
-      baseVal = topVal < 30 ? 0 : topVal - 30; //30 = 3c
+      baseVal = minVal > topVal - 30 ? (topVal < 30 ? 0 : topVal - 30) : minVal;
       //baseVal = BASE_VAL_T_IN;
       //topVal = TOP_VAL_T_IN;
       colorLine = BLUE;
@@ -680,7 +680,7 @@ byte ConvertToByte(byte mode, float val)
       return ((byte)(val / 10));
       break;
     case 5: //P
-      return ((byte)(val - 520));
+      return ((byte)(val - 7200) / 3);
       break;
   }
 }

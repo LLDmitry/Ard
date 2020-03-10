@@ -494,15 +494,15 @@ void ShowStatistic()
   switch (Mode)
   {
     case 1: //T inn
-      DrawRect(W1 - 1, H1 - 1, W2, H2, WHITE, false);
+      DrawRect(W1 - 1, H1 - 1, W2, H2, CYAN, false);
       break;
     case 2: //T out
-      DrawRect(0, 0, W1, H1 + H2 - 1, WHITE, false);
+      DrawRect(0, 0, W1, H1 + H2 - 1, CYAN, false);
     case 4: //CO2
-      DrawRect(W1 - 1, 0, W2, H1, WHITE, false);
+      DrawRect(W1 - 1, 0, W2, H1, CYAN, false);
       break;
     case 5: //P
-      DrawRect(0, H1 + H2 - 2, W1, H3, WHITE, false);
+      DrawRect(0, H1 + H2 - 2, W1, H3, CYAN, false);
       break;
   }
 
@@ -529,7 +529,7 @@ void ShowStatistic()
   {
     case 1: //T inn
       topVal = maxVal > 250 ? 255 : maxVal + 5;
-      baseVal = topVal < 30 ? 0 : topVal - 30; //30 = 3c
+      baseVal = minVal > topVal - 30 ? (topVal < 30 ? 0 : topVal - 30) : minVal; //30 = 3c
       colorLine = RED;
       break;
     case 2: //T out
