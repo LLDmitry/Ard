@@ -380,31 +380,27 @@ void DisplayData()
   {
     TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
     TFTscreen.setTextColor(BLACK);
-    dtostrf(abs(prev_tOut_int), 4, 1, str_temp);
-    sprintf(printout, "%s", str_temp);
+    sprintf(printout, "%d", prev_tOut_int);
     PrintText(printout, abs(prev_tOut_int) < 10.0 ? 1 : 12, 30);
 
     TFTscreen.setTextColor(BLACK);
-    dtostrf(abs(prev_tOut_dec), 4, 1, str_temp);
-    sprintf(printout, "%s", str_temp);
+    sprintf(printout, ".%d", prev_tOut_dec);
     PrintText(printout, abs(prev_tOut_int) < 10.0 ? 90 : 120, 30);    
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
-    dtostrf(abs(tOut_int), 4, 1, str_temp);
-    sprintf(printout, "%s", str_temp);
+    sprintf(printout, "%d", tOut_int);
     PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 1 : 12, 30);    
     TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
-if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
+  if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
   {
     if (tOut_int == prev_tOut_int)
     {
       TFTscreen.setTextColor(BLACK);
-      dtostrf(abs(prev_tOut_dec), 4, 1, str_temp);
-      sprintf(printout, "%d", str_temp);
+      sprintf(printout, ".%d", prev_tOut_dec);
       PrintText(printout, abs(prev_tOut) < 10.0 ? 90 : 120, 30);
     }
 
@@ -412,8 +408,7 @@ if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
-    dtostrf(abs(tOut_dec), 4, 1, str_temp);
-    sprintf(printout, "%d", str_temp);
+    sprintf(printout, ".%d", tOut_dec);
     PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 90 : 120, 30);
     prev_tOut_int = tOut_int;
     prev_tOut_dec = tOut_dec;
