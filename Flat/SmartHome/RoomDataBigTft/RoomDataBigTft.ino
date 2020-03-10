@@ -142,7 +142,8 @@ byte h_v = 0;
 float t_inn = 0.0f;
 int ppm_v = 0;
 
-float prev_tOut = 0.0f;
+int prev_tOut_int = 0;
+byte prev_tOut_dec = 0;
 float prev_t_inn = 0.0f;
 byte prev_h_v = 0;
 int prev_ppm_v = 0;
@@ -372,25 +373,46 @@ void DisplayData()
 
 
 
-  if (nrfRequest.tOut != prev_tOut)
+  int tOut_int = (int)nrfRequest.tOut;
+  byte tOut_dec = (int)(nrfRequest.tOut - tOut_int)
+
+  if (tOut_int != prev_tOut_int)
   {
     TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
-    //DrawRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK, true); //T out
     TFTscreen.setTextColor(BLACK);
-    dtostrf(abs(prev_tOut), 4, 1, str_temp);
-    sprintf(printout, "%s", str_temp);
-    PrintText(printout, abs(prev_tOut) < 10.0 ? 1 : 12, 30);
+    sprintf(printout, "%d", prev_tOut_int);
+    PrintText(printout, abs(prev_tOut_int) < 10.0 ? 1 : 12, 30);
+
+    TFTscreen.setTextColor(BLACK);
+    sprintf(printout, ".%d", prev_tOut_dec);
+    PrintText(printout, abs(prev_tOut_int) < 10.0 ? 90 : 120, 30);    
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
-    dtostrf(abs(nrfRequest.tOut), 4, 1, str_temp);
-    sprintf(printout, "%s", str_temp);
-    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 1 : 12, 30);
-    prev_tOut = nrfRequest.tOut;
+    sprintf(printout, "%d", tOut_int);
+    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 1 : 12, 30);    
     TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
+  if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
+  {
+    if (tOut_int == prev_tOut_int)
+    {
+      TFTscreen.setTextColor(BLACK);
+      sprintf(printout, ".%d", prev_tOut_dec);
+      PrintText(printout, abs(prev_tOut) < 10.0 ? 90 : 120, 30);
+    }
+
+    if (nrfRequest.tOut < 0)
+      TFTscreen.setTextColor(BLUE);
+    else
+      TFTscreen.setTextColor(ORANGE);
+    sprintf(printout, ".%d", tOut_dec);
+    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 90 : 120, 30);
+    prev_tOut_int = tOut_int;
+    prev_tOut_dec = tOut_dec;
+  }  
 
   if (nrfRequest.p_v != prev_p_v)
   {
@@ -494,15 +516,15 @@ void ShowStatistic()
   switch (Mode)
   {
     case 1: //T inn
-      DrawRect(W1 - 1, H1 - 1, W2, H2, WHITE, false);
+      DrawRect(W1 - 1, H1 - 1, W2, H2, CYAN, false);
       break;
     case 2: //T out
-      DrawRect(0, 0, W1, H1 + H2 - 1, WHITE, false);
+      DrawRect(0, 0, W1, H1 + H2 - 1, CYAN, false);
     case 4: //CO2
-      DrawRect(W1 - 1, 0, W2, H1, WHITE, false);
+      DrawRect(W1 - 1, 0, W2, H1, CYAN, false);
       break;
     case 5: //P
-      DrawRect(0, H1 + H2 - 2, W1, H3, WHITE, false);
+      DrawRect(0, H1 + H2 - 2, W1, H3, CYAN, false);
       break;
   }
 
@@ -529,7 +551,7 @@ void ShowStatistic()
   {
     case 1: //T inn
       topVal = maxVal > 250 ? 255 : maxVal + 5;
-      baseVal = topVal < 30 ? 0 : topVal - 30; //30 = 3c
+      baseVal = minVal > topVal - 30 ? (topVal < 30 ? 0 : topVal - 30) : minVal; //30 = 3c
       colorLine = RED;
       break;
     case 2: //T out
