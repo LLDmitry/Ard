@@ -142,7 +142,8 @@ byte h_v = 0;
 float t_inn = 0.0f;
 int ppm_v = 0;
 
-float prev_tOut = 0.0f;
+int prev_tOut_int = 0;
+byte prev_tOut_dec = 0;
 float prev_t_inn = 0.0f;
 byte prev_h_v = 0;
 int prev_ppm_v = 0;
@@ -372,25 +373,51 @@ void DisplayData()
 
 
 
-  if (nrfRequest.tOut != prev_tOut)
+  int tOut_int = (int)nrfRequest.tOut;
+  byte tOut_dec = (int)(nrfRequest.tOut - tOut_int)
+
+  if (tOut_int != prev_tOut_int)
   {
     TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
-    //DrawRect(1, H1 + 1, W1 - 2, H2 - 2, BLACK, true); //T out
     TFTscreen.setTextColor(BLACK);
-    dtostrf(abs(prev_tOut), 4, 1, str_temp);
+    dtostrf(abs(prev_tOut_int), 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, abs(prev_tOut) < 10.0 ? 1 : 12, 30);
+    PrintText(printout, abs(prev_tOut_int) < 10.0 ? 1 : 12, 30);
+
+    TFTscreen.setTextColor(BLACK);
+    dtostrf(abs(prev_tOut_dec), 4, 1, str_temp);
+    sprintf(printout, "%s", str_temp);
+    PrintText(printout, abs(prev_tOut_int) < 10.0 ? 90 : 120, 30);    
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
-    dtostrf(abs(nrfRequest.tOut), 4, 1, str_temp);
+    dtostrf(abs(tOut_int), 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 1 : 12, 30);
-    prev_tOut = nrfRequest.tOut;
+    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 1 : 12, 30);    
     TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
+if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
+  {
+    if (tOut_int == prev_tOut_int)
+    {
+      TFTscreen.setTextColor(BLACK);
+      dtostrf(abs(prev_tOut_dec), 4, 1, str_temp);
+      sprintf(printout, "%d", str_temp);
+      PrintText(printout, abs(prev_tOut) < 10.0 ? 90 : 120, 30);
+    }
+
+    if (nrfRequest.tOut < 0)
+      TFTscreen.setTextColor(BLUE);
+    else
+      TFTscreen.setTextColor(ORANGE);
+    dtostrf(abs(tOut_dec), 4, 1, str_temp);
+    sprintf(printout, "%d", str_temp);
+    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 90 : 120, 30);
+    prev_tOut_int = tOut_int;
+    prev_tOut_dec = tOut_dec;
+  }  
 
   if (nrfRequest.p_v != prev_p_v)
   {
