@@ -545,11 +545,18 @@ void ShowStatistic()
     case 4: //CO2
       baseVal = BASE_VAL_CO2;
       topVal = TOP_VAL_CO2;
-      colorLine = BLUE;
+      colorLine = CYAN;
       break;
     case 5: //P
       topVal = maxVal > 252 ? 255 : maxVal + 3;
       baseVal = minVal < 3 ? 0 : minVal - 3;
+      if (topVal - baseVal < 15) //<4.5mm
+      {
+        if (baseVal + 15 < 252)
+          topVal = baseVal + 15;
+        else
+          baseVal = topVal - 15;
+      }
       colorLine = YELLOW;
       break;
   }
