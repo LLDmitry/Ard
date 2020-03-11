@@ -372,27 +372,49 @@ void DisplayData()
   //  }
 
 
-
+  //  nrfRequest.tOut = 2.3;
   int tOut_int = (int)nrfRequest.tOut;
-  byte tOut_dec = (int)(nrfRequest.tOut - tOut_int)
+  //
+  //  float dec = nrfRequest.tOut - tOut_int;
+  //  if (dec == 0.20)
+  //  Serial.println("0.2");
+  //  else
+  //  Serial.println("<0.2");
+  //
+  //  int deci = (float)dec*10.0;
+  //  Serial.print("dec = ");
+  //  Serial.println(dec);
+  //    Serial.print("deci = ");
+  //  Serial.println(deci);
+
+  int tOut_dec = (float)((float)nrfRequest.tOut - (float)tOut_int) * 10.0;
+
+  Serial.print("t_out = ");
+  Serial.println(nrfRequest.tOut);
+  Serial.print("tOut_int = ");
+  Serial.println(tOut_int);
+  Serial.print("tOut_dec = " + tOut_dec);
+  Serial.println(tOut_dec);
 
   if (tOut_int != prev_tOut_int)
   {
     TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
     TFTscreen.setTextColor(BLACK);
     sprintf(printout, "%d", prev_tOut_int);
-    PrintText(printout, abs(prev_tOut_int) < 10.0 ? 1 : 12, 30);
+    PrintText(printout, abs(prev_tOut_int) < 10 ? 45 : 12, 30);
 
     TFTscreen.setTextColor(BLACK);
-    sprintf(printout, ".%d", prev_tOut_dec);
-    PrintText(printout, abs(prev_tOut_int) < 10.0 ? 90 : 120, 30);    
+    sprintf(printout, "%d", prev_tOut_dec);
+    //    PrintText(printout, abs(prev_tOut_int) < 10 ? 1 : 110, 46);
+    //PrintText(printout, , 46);
+    PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 80 : 110, 45);
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
     sprintf(printout, "%d", tOut_int);
-    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 1 : 12, 30);    
+    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 45 : 12, 30);
     TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
   if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
@@ -400,8 +422,10 @@ void DisplayData()
     if (tOut_int == prev_tOut_int)
     {
       TFTscreen.setTextColor(BLACK);
-      sprintf(printout, ".%d", prev_tOut_dec);
-      PrintText(printout, abs(prev_tOut) < 10.0 ? 90 : 120, 30);
+      //sprintf(printout, "%d", prev_tOut_dec);
+      //      PrintText(printout, abs(prev_tOut_int) < 10 ? 1 : 110, 46);
+      //PrintText(String(prev_tOut_dec), 5, 46);
+      PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 80 : 110, 45);
     }
 
     if (nrfRequest.tOut < 0)
@@ -409,10 +433,12 @@ void DisplayData()
     else
       TFTscreen.setTextColor(ORANGE);
     sprintf(printout, ".%d", tOut_dec);
-    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 90 : 120, 30);
+    //PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 90 : 120, 45);
+    //    PrintText(String(tOut_dec), 5, 46);
+    PrintText("." + String(tOut_dec), abs(prev_tOut_int) < 10 ? 80 : 110, 45);
     prev_tOut_int = tOut_int;
     prev_tOut_dec = tOut_dec;
-  }  
+  }
 
   if (nrfRequest.p_v != prev_p_v)
   {
@@ -774,17 +800,17 @@ byte ConvertToByte(byte mode, float val)
 void ReadFromEEPROM(byte nMode)
 {
   //  Serial.println("");
-  Serial.print("ReadFromEEPROM. Mode =");
-  Serial.println(nMode);
+  //  Serial.print("ReadFromEEPROM. Mode =");
+  //  Serial.println(nMode);
   for (byte i = 0; i < NUMBER_STATISTICS; i++)
   {
     EEPROM.get(NUMBER_STATISTICS * (nMode - 1) + i, values[i]);
-    if (nMode == 4)//ppm_v
-    {
-      Serial.print(i);
-      Serial.print(" ");
-      Serial.println(values[i]);
-    }
+    //    if (nMode == 4)//ppm_v
+    //    {
+    //      Serial.print(i);
+    //      Serial.print(" ");
+    //      Serial.println(values[i]);
+    //    }
   }
 }
 
@@ -941,6 +967,7 @@ void DrawRect(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int color, bool fi
 void PrintText(String text, int16_t x, int16_t y)
 {
   Serial.println("PrintText");
+  Serial.println(text);
   //TFTscreen.text(text, x, y);
 
   TFTscreen.setCursor(x, y);             // Определяем координаты верхнего левого угла области вывода
