@@ -377,7 +377,7 @@ void DisplayData()
   //    Serial.print("deci = ");
   //  Serial.println(deci);
 
-  int tOut_dec = (float)((float)nrfRequest.tOut - (float)tOut_int) * 10.0;
+  int tOut_dec = (int)((nrfRequest.tOut - (float)tOut_int) * 10);
 
   Serial.print("t_out = ");
   Serial.println(nrfRequest.tOut);
@@ -390,21 +390,16 @@ void DisplayData()
   {
     TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
     TFTscreen.setTextColor(BLACK);
-    sprintf(printout, "%d", abs(prev_tOut_int);
-    PrintText(printout, abs(prev_tOut_int) < 10 ? 45 : 12, 30);
+    PrintText(String(abs(prev_tOut_int)), abs(prev_tOut_int) < 10 ? 45 : 12, 30);
 
     TFTscreen.setTextColor(BLACK);
-    sprintf(printout, "%d", prev_tOut_dec);
-    //    PrintText(printout, abs(prev_tOut_int) < 10 ? 1 : 110, 46);
-    //PrintText(printout, , 46);
     PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 80 : 110, 45);
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
-    sprintf(printout, "%d", abs(tOut_int);
-    PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 45 : 12, 30);
+    PrintText(String(abs(tOut_int)), abs(nrfRequest.tOut) < 10.0 ? 45 : 12, 30);
     TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
   if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
@@ -412,9 +407,6 @@ void DisplayData()
     if (tOut_int == prev_tOut_int)
     {
       TFTscreen.setTextColor(BLACK);
-      //sprintf(printout, "%d", prev_tOut_dec);
-      //      PrintText(printout, abs(prev_tOut_int) < 10 ? 1 : 110, 46);
-      //PrintText(String(prev_tOut_dec), 5, 46);
       PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 80 : 110, 45);
     }
 
@@ -422,9 +414,6 @@ void DisplayData()
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
-    sprintf(printout, ".%d", tOut_dec);
-    //PrintText(printout, abs(nrfRequest.tOut) < 10.0 ? 90 : 120, 45);
-    //    PrintText(String(tOut_dec), 5, 46);
     PrintText("." + String(tOut_dec), abs(prev_tOut_int) < 10 ? 80 : 110, 45);
     prev_tOut_int = tOut_int;
     prev_tOut_dec = tOut_dec;
