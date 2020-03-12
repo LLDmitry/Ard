@@ -373,29 +373,8 @@ void DisplayData()
   //  }
 
 
-  //  nrfRequest.tOut = 2.3;
   int tOut_int = (int)nrfRequest.tOut;
-  //
-  //  float dec = nrfRequest.tOut - tOut_int;
-  //  if (dec == 0.20)
-  //  Serial.println("0.2");
-  //  else
-  //  Serial.println("<0.2");
-  //
-  //  int deci = (float)dec*10.0;
-  //  Serial.print("dec = ");
-  //  Serial.println(dec);
-  //    Serial.print("deci = ");
-  //  Serial.println(deci);
-
   int tOut_dec = (float)((float)nrfRequest.tOut - (float)tOut_int) * 10.0;
-
-  Serial.print("t_out = ");
-  Serial.println(nrfRequest.tOut);
-  Serial.print("tOut_int = ");
-  Serial.println(tOut_int);
-  Serial.print("tOut_dec = " + tOut_dec);
-  Serial.println(tOut_dec);
 
   if (tOut_int != prev_tOut_int)
   {
@@ -404,7 +383,7 @@ void DisplayData()
     PrintText(String(abs(prev_tOut_int)), abs(prev_tOut_int) < 10 ? 30 : 12, 30);
 
     TFTscreen.setTextColor(BLACK);
-    PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 70 : 80, 45);
+    PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 65 : 80, 45);
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
@@ -418,14 +397,14 @@ void DisplayData()
     if (tOut_int == prev_tOut_int)
     {
       TFTscreen.setTextColor(BLACK);
-      PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 70 : 80, 45);
+      PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 65 : 80, 45);
     }
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
-    PrintText("." + String(tOut_dec), abs(nrfRequest.tOut) < 10.0 ? 70 : 80, 45);
+    PrintText("." + String(tOut_dec), abs(nrfRequest.tOut) < 10.0 ? 65 : 80, 45);
     prev_tOut_int = tOut_int;
     prev_tOut_dec = tOut_dec;
   }
@@ -446,11 +425,11 @@ void DisplayData()
     TFTscreen.setTextColor(BLACK);
     dtostrf(prev_t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, W1 + 20, 14);
+    PrintText(printout, W1 + prev_t_inn < 10 ? 20 : 10, 14);
     TFTscreen.setTextColor(CYAN);
     dtostrf(t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, W1 + 20, 14);
+    PrintText(printout, W1 + t_inn < 10 ? 20 : 10, 14);
     prev_t_inn = t_inn;
   }
 
@@ -521,7 +500,7 @@ void ShowStatistic()
   DrawRect(W1 + W2 - 2, 0, W3, H1, DARK_GREAY, false); //CO2
   DrawRect(W1 - 1, H1  - 1, W2, H2, DARK_GREAY, false); //P
   DrawRect(W1 - 1, 0, W2, H1, DARK_GREAY, false); //T in
-  DrawRect(W1 + W2 - 2, H1 - 1, W3, H2, DARK_GREAY, false); //Hm
+  //DrawRect(W1 + W2 - 2, H1 - 1, W3, H2, DARK_GREAY, false); //Hm
 
   //hide prev graph
   HidePrevGraph();
@@ -533,6 +512,7 @@ void ShowStatistic()
       break;
     case 2: //T out
       DrawRect(0, 0, W1, H1 + H2 - 1, CYAN, false); //T out
+      break;
     case 4: //CO2
       DrawRect(W1 + W2 - 2, 0, W3, H1, CYAN, false); //CO2
       break;
@@ -640,35 +620,16 @@ void ShowStatistic()
 
 void HidePrevGraph()
 {
-  //DrawRect(0, H1 + H2 + H3 + 1, 240, 320 - (H1 + H2 + H3 + 1), BLACK, true);
-
   for (byte x = 1; x <= NUMBER_STATISTICS; x++)
   {
-    byte x1 = 5 + (x - 1) * 4;
-    byte x2 = 5 + x * 4;
+    int x1 = 5 + (x - 1) * 5;
+    int x2 = 5 + x * 5;
     TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - prevGraph[x - 1]), x2, (HEIGHT_DISPLAY - prevGraph[x]), BLACK);
   }
 }
 
 void SaveStatistic()
-{
-  //temperatures[indexStatistic] = t_inn * 10;  //197 вместо 19.7, чтобы хранить integer
-  //humidities[indexStatistic] = h_v;
-  //co2s[indexStatistic] = ppm_v / 10;
-  //pressures[indexStatistic] = p_v - 520;
-
-  //Serial.println("");
-  //  Serial.println(NUMBER_STATISTICS * 2 + indexStatistic);
-  //  Serial.println((int)(t_inn * 10));
-  //  Serial.println(h_v);
-  //  Serial.println(ppm_v/10);
-  //  Serial.println(p_v-520);
-  //  Serial.println("EEPROM.put(indexStatistic, ConvertToByte(1, t_inn));");
-  //  Serial.println(t_inn);
-  //  Serial.println(ConvertToByte(1, t_inn));
-  Serial.print("indexStatistic0 ");
-  Serial.println(indexStatistic);
-
+{  
   Serial.println("EEPROM.put(indexStatistic, ConvertToByte(4, ppm_v);");
   Serial.println(ppm_v);
   Serial.println(ConvertToByte(4, ppm_v));
@@ -679,13 +640,8 @@ void SaveStatistic()
   EEPROM.put(NUMBER_STATISTICS * 3 + indexStatistic, ConvertToByte(4, ppm_v));
   EEPROM.put(NUMBER_STATISTICS * 4 + indexStatistic, ConvertToByte(5, nrfRequest.p_v));
 
-
-
   indexStatistic = (indexStatistic < (NUMBER_STATISTICS - 1) ? indexStatistic + 1 : 0);  //доходим до NUMBER_STATISTICS и затем снова начинаем с 0
   EEPROM.put(EEPROM_ADR_INDEX_STATISTIC, indexStatistic);
-
-  Serial.print("indexStatistic1 ");
-  Serial.println(indexStatistic);
 }
 
 byte ConvertToByte(byte mode, float val)
