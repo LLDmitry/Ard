@@ -622,8 +622,8 @@ void HidePrevGraph()
 {
   for (byte x = 1; x <= NUMBER_STATISTICS; x++)
   {
-    int x1 = 5 + (x - 1) * 5;
-    int x2 = 5 + x * 5;
+    int x1 = 10 + (x - 1) * 5;
+    int x2 = 10 + x * 5;
     TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - prevGraph[x - 1]), x2, (HEIGHT_DISPLAY - prevGraph[x]), BLACK);
   }
 }
