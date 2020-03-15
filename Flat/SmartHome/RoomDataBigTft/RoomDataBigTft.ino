@@ -368,22 +368,22 @@ void DisplayData()
     if (prev_tOut_int < 0 || prev_tOut_dec < 0)
     {
       TFTscreen.setTextSize(2);      // Устанавливаем размер шрифта
-      PrintText("-", abs(prev_tOut_int) < 10 ? 13 : 2, 40);
+      PrintText("-", abs(prev_tOut_int) < 10 ? 22 : 2, 41);
     }
     TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
 
-    PrintText(String(abs(prev_tOut_int)), abs(prev_tOut_int) < 10 ? 30 : 12, 30);
+    PrintText(String(abs(prev_tOut_int)), abs(prev_tOut_int) < 10 ? 40 : 15, 30);
 
     TFTscreen.setTextColor(BLACK);
-    PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 62 : 80, 45);
+    PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 72 : 80, 45);
     TFTscreen.setTextColor(CYAN);
     if (nrfRequest.tOut < 0)
     {
       TFTscreen.setTextSize(2);      // Устанавливаем размер шрифта
-      PrintText("-", abs(prev_tOut_int) < 10.0 ? 13 : 2, 40);
+      PrintText("-", abs(prev_tOut_int) < 10.0 ? 22 : 2, 41);
       TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
     }
-    PrintText(String(abs(tOut_int)), abs(nrfRequest.tOut) < 10.0 ? 30 : 12, 30);
+    PrintText(String(abs(tOut_int)), abs(nrfRequest.tOut) < 10.0 ? 40 : 15, 30);
     TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
   if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
@@ -391,10 +391,10 @@ void DisplayData()
     if (tOut_int == prev_tOut_int)
     {
       TFTscreen.setTextColor(BLACK);
-      PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 62 : 80, 45);
+      PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 72 : 80, 45);
     }
     TFTscreen.setTextColor(CYAN);
-    PrintText("." + String(abs(tOut_dec)), abs(tOut_int) < 10 ? 62 : 80, 45);
+    PrintText("." + String(abs(tOut_dec)), abs(tOut_int) < 10 ? 72 : 80, 45);
     prev_tOut_int = tOut_int;
     prev_tOut_dec = tOut_dec;
   }
@@ -446,7 +446,7 @@ void DisplayData()
 
     if (prev_co2backColor != co2backColor)
     {
-      DrawRect(W1 + W2, 1, W2 - 3, H1 - 2, co2backColor, true); //CO2
+      DrawRect(W1 + W2 - 1, 1, W3, H1 - 2, co2backColor, true); //CO2
     }
     else
     {
@@ -487,10 +487,10 @@ void ShowStatistic()
   const byte HEIGHT_GRAPH = 130;
 
   DrawRect(0, 0, W1, H1 + H2 - 1, DARK_GREAY, false); //T out
-  DrawRect(W1 + W2 - 2, 0, W3, H1, DARK_GREAY, false); //CO2
+  DrawRect(W1 + W2 - 2, 0, W3 + 1, H1, DARK_GREAY, false); //CO2
   DrawRect(W1 - 1, H1  - 1, W2, H2, DARK_GREAY, false); //P
   DrawRect(W1 - 1, 0, W2, H1, DARK_GREAY, false); //T in
-  DrawRect(W1 + W2 - 2, H1 - 1, W3, H2, DARK_GREAY, false); //Hm
+  DrawRect(W1 + W2 - 2, H1 - 1, W3 + 1, H2, DARK_GREAY, false); //Hm
 
   //hide prev graph
   HidePrevGraph();
@@ -504,7 +504,7 @@ void ShowStatistic()
       DrawRect(0, 0, W1, H1 + H2 - 1, GREEN, false); //T out
       break;
     case 4: //CO2
-      DrawRect(W1 + W2 - 2, 0, W3, H1, GREEN, false); //CO2
+      DrawRect(W1 + W2 - 2, 0, W3 + 1, H1, GREEN, false); //CO2
       break;
     case 5: //P
       DrawRect(W1 - 1, H1 - 1, W2, H2, GREEN, false); //P
