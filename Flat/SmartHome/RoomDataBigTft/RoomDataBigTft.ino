@@ -123,9 +123,9 @@ const String IR_CODE_VENT2 = "38863bca";
 const String IR_CODE_VENT_STOP = "38863bca";
 const String IR_CODE_VENT_AUTO = "38863bca";
 
-const byte W1 = 130;
+const byte W1 = 135;
 const byte W2 = 95;
-const byte W3 = 95;
+const byte W3 = 90;
 const byte H1 = 50;
 const byte H2 = 50;
 
@@ -357,22 +357,6 @@ void DisplayData()
   Serial.println("DisplayData");
   char printout[128];
   char str_temp[5];
-
-  //  if (nrfRequest.hours != prev_hours || nrfRequest.minutes != prev_minutes)
-  //  {
-  //    //DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
-  //    TFTscreen.setTextColor(DARK_GREAY);
-  //    sprintf(printout, "%d:%02d", prev_hours, prev_minutes);
-  //    PrintText(printout, 20, 15);
-  //
-  //    TFTscreen.setTextColor(BLACK);
-  //    sprintf(printout, "%d:%02d", nrfRequest.hours, nrfRequest.minutes);
-  //    PrintText(printout, 20, 15);f
-  //    prev_hours = nrfRequest.hours;
-  //    prev_minutes = nrfRequest.minutes;
-  //  }
-
-
   int tOut_int = (int)nrfRequest.tOut;
   int tOut_dec = (float)((float)nrfRequest.tOut - (float)tOut_int) * 10.0;
 
@@ -380,17 +364,25 @@ void DisplayData()
   Serial.println(tOut_dec);
   if (tOut_int != prev_tOut_int)
   {
-    TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
     TFTscreen.setTextColor(BLACK);
+    if (prev_tOut_int < 0 || prev_tOut_dec < 0)
+    {
+      TFTscreen.setTextSize(2);      // Устанавливаем размер шрифта
+      PrintText("-", abs(prev_tOut_int) < 10 ? 13 : 2, 40);
+    }
+    TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
+
     PrintText(String(abs(prev_tOut_int)), abs(prev_tOut_int) < 10 ? 30 : 12, 30);
 
     TFTscreen.setTextColor(BLACK);
     PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 62 : 80, 45);
-
+    TFTscreen.setTextColor(CYAN);
     if (nrfRequest.tOut < 0)
-      TFTscreen.setTextColor(BLUE);
-    else
-      TFTscreen.setTextColor(ORANGE);
+    {
+      TFTscreen.setTextSize(2);      // Устанавливаем размер шрифта
+      PrintText("-", abs(prev_tOut_int) < 10.0 ? 13 : 2, 40);
+      TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
+    }
     PrintText(String(abs(tOut_int)), abs(nrfRequest.tOut) < 10.0 ? 30 : 12, 30);
     TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
   }
@@ -401,11 +393,7 @@ void DisplayData()
       TFTscreen.setTextColor(BLACK);
       PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 62 : 80, 45);
     }
-
-    if (nrfRequest.tOut < 0)
-      TFTscreen.setTextColor(BLUE);
-    else
-      TFTscreen.setTextColor(ORANGE);
+    TFTscreen.setTextColor(CYAN);
     PrintText("." + String(abs(tOut_dec)), abs(tOut_int) < 10 ? 62 : 80, 45);
     prev_tOut_int = tOut_int;
     prev_tOut_dec = tOut_dec;
