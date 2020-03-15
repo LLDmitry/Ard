@@ -112,7 +112,7 @@ const int LEVEL3_CO2_ALARM = 1200;
 const int LIGHT_LEVEL_DARK = 370;
 
 const int EEPROM_ADR_INDEX_STATISTIC = 1023; //last address in eeprom for store indexStatistic
-const uint16_t HEIGHT_DISPLAY = 240;
+const uint16_t HEIGHT_DISPLAY = 236;
 
 // Single radio pipe address for the 2 nodes to communicate.  Значение "трубы" передатчика и приемника ОБЯЗАНЫ быть одинаковыми.
 //const uint64_t readingPipe = 0xE8E8F0F0AALL;  // д.б. свой для каждого блока
@@ -144,7 +144,7 @@ float t_inn = 0.0f;
 int ppm_v = 0;
 
 int prev_tOut_int = 0;
-byte prev_tOut_dec = 0;
+int prev_tOut_dec = 0;
 float prev_t_inn = 0.0f;
 byte prev_h_v = 0;
 int prev_ppm_v = 0;
@@ -376,6 +376,8 @@ void DisplayData()
   int tOut_int = (int)nrfRequest.tOut;
   int tOut_dec = (float)((float)nrfRequest.tOut - (float)tOut_int) * 10.0;
 
+  Serial.println(prev_tOut_dec);
+  Serial.println(tOut_dec);
   if (tOut_int != prev_tOut_int)
   {
     TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
@@ -383,7 +385,7 @@ void DisplayData()
     PrintText(String(abs(prev_tOut_int)), abs(prev_tOut_int) < 10 ? 30 : 12, 30);
 
     TFTscreen.setTextColor(BLACK);
-    PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 65 : 80, 45);
+    PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 62 : 80, 45);
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
@@ -397,14 +399,14 @@ void DisplayData()
     if (tOut_int == prev_tOut_int)
     {
       TFTscreen.setTextColor(BLACK);
-      PrintText("." + String(prev_tOut_dec), abs(prev_tOut_int) < 10 ? 65 : 80, 45);
+      PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 62 : 80, 45);
     }
 
     if (nrfRequest.tOut < 0)
       TFTscreen.setTextColor(BLUE);
     else
       TFTscreen.setTextColor(ORANGE);
-    PrintText("." + String(tOut_dec), abs(nrfRequest.tOut) < 10.0 ? 65 : 80, 45);
+    PrintText("." + String(abs(tOut_dec)), abs(tOut_int) < 10 ? 62 : 80, 45);
     prev_tOut_int = tOut_int;
     prev_tOut_dec = tOut_dec;
   }
@@ -425,11 +427,11 @@ void DisplayData()
     TFTscreen.setTextColor(BLACK);
     dtostrf(prev_t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, W1 + prev_t_inn < 10 ? 20 : 10, 14);
+    PrintText(printout, W1 + (prev_t_inn < 10 ? 20 : 12), 14);
     TFTscreen.setTextColor(CYAN);
     dtostrf(t_inn, 4, 1, str_temp);
     sprintf(printout, "%s", str_temp);
-    PrintText(printout, W1 + t_inn < 10 ? 20 : 10, 14);
+    PrintText(printout, W1 + (t_inn < 10 ? 20 : 12), 14);
     prev_t_inn = t_inn;
   }
 
@@ -456,7 +458,7 @@ void DisplayData()
 
     if (prev_co2backColor != co2backColor)
     {
-      DrawRect(W1 + W2 + 1, 1, W2 - 3, H1 - 2, co2backColor, true); //CO2
+      DrawRect(W1 + W2, 1, W2 - 3, H1 - 2, co2backColor, true); //CO2
     }
     else
     {
@@ -496,11 +498,11 @@ void ShowStatistic()
   unsigned int colorLine;
   const byte HEIGHT_GRAPH = 130;
 
-  DrawRect(0, 0, W1, H1 + H2 - 2, DARK_GREAY, false); //T out
+  DrawRect(0, 0, W1, H1 + H2 - 1, DARK_GREAY, false); //T out
   DrawRect(W1 + W2 - 2, 0, W3, H1, DARK_GREAY, false); //CO2
   DrawRect(W1 - 1, H1  - 1, W2, H2, DARK_GREAY, false); //P
   DrawRect(W1 - 1, 0, W2, H1, DARK_GREAY, false); //T in
-  //DrawRect(W1 + W2 - 2, H1 - 1, W3, H2, DARK_GREAY, false); //Hm
+  DrawRect(W1 + W2 - 2, H1 - 1, W3, H2, DARK_GREAY, false); //Hm
 
   //hide prev graph
   HidePrevGraph();
@@ -508,16 +510,16 @@ void ShowStatistic()
   switch (Mode)
   {
     case 1: //T inn
-      DrawRect(W1 - 1, 0, W2, H1, CYAN, false); //T in
+      DrawRect(W1 - 1, 0, W2, H1, GREEN, false); //T in
       break;
     case 2: //T out
-      DrawRect(0, 0, W1, H1 + H2 - 1, CYAN, false); //T out
+      DrawRect(0, 0, W1, H1 + H2 - 1, GREEN, false); //T out
       break;
     case 4: //CO2
-      DrawRect(W1 + W2 - 2, 0, W3, H1, CYAN, false); //CO2
+      DrawRect(W1 + W2 - 2, 0, W3, H1, GREEN, false); //CO2
       break;
     case 5: //P
-      DrawRect(W1 - 1, H1 - 1, W2, H2, CYAN, false); //P
+      DrawRect(W1 - 1, H1 - 1, W2, H2, GREEN, false); //P
       break;
   }
 
@@ -607,8 +609,11 @@ void ShowStatistic()
       if (y2 > (HEIGHT_GRAPH - 2)) y2 = HEIGHT_GRAPH - 2;
       if (y2 < 2) y2 = 2;
       int x1 = 10 + (x - 1) * 5;
-      int x2 = 5 + x * 5;
+      int x2 = 10 + x * 5;
       TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - y1), x2, (HEIGHT_DISPLAY - y2), colorLine);
+
+      //TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - prevGraph[x - 1]), x2, (HEIGHT_DISPLAY - prevGraph[x]), BLACK);
+
       if (x == 1) prevGraph[0] = y1;
       prevGraph[x] = y2;
     }
@@ -620,7 +625,7 @@ void ShowStatistic()
 
 void HidePrevGraph()
 {
-  for (byte x = 1; x <= NUMBER_STATISTICS; x++)
+  for (byte x = 1; x <= NUMBER_STATISTICS - 1; x++)
   {
     int x1 = 10 + (x - 1) * 5;
     int x2 = 10 + x * 5;
@@ -629,7 +634,7 @@ void HidePrevGraph()
 }
 
 void SaveStatistic()
-{  
+{
   Serial.println("EEPROM.put(indexStatistic, ConvertToByte(4, ppm_v);");
   Serial.println(ppm_v);
   Serial.println(ConvertToByte(4, ppm_v));
