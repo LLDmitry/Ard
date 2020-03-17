@@ -362,41 +362,45 @@ void DisplayData()
 
   Serial.println(prev_tOut_dec);
   Serial.println(tOut_dec);
-  if (tOut_int != prev_tOut_int)
+  if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
   {
-    TFTscreen.setTextColor(BLACK);
-    if (prev_tOut_int < 0 || prev_tOut_dec < 0)
+    if (tOut_int != prev_tOut_int)
     {
-      TFTscreen.setTextSize(2);      // Устанавливаем размер шрифта
+      TFTscreen.setTextColor(BLACK);
+      TFTscreen.setTextSize(5);
+      PrintText(String(abs(prev_tOut_int)), abs(prev_tOut_int) < 10 ? 40 : 15, 30);
+      PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 72 : 80, 45);
+
+      TFTscreen.setTextColor(CYAN);
+      PrintText(String(abs(tOut_int)), abs(nrfRequest.tOut) < 10.0 ? 40 : 15, 30);
+    }
+
+    if ((prev_tOut_int < 0 || prev_tOut_dec < 0) && (!(tOut_int < 0 || tOut_dec < 0) || tOut_int != prev_tOut_int))
+    {
+      TFTscreen.setTextColor(BLACK);
+      TFTscreen.setTextSize(2);
       PrintText("-", abs(prev_tOut_int) < 10 ? 22 : 2, 41);
     }
-    TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
-
-    PrintText(String(abs(prev_tOut_int)), abs(prev_tOut_int) < 10 ? 40 : 15, 30);
-
-    TFTscreen.setTextColor(BLACK);
-    PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 72 : 80, 45);
     TFTscreen.setTextColor(CYAN);
     if (nrfRequest.tOut < 0)
     {
       TFTscreen.setTextSize(2);      // Устанавливаем размер шрифта
       PrintText("-", abs(prev_tOut_int) < 10.0 ? 22 : 2, 41);
-      TFTscreen.setTextSize(5);      // Устанавливаем размер шрифта
     }
-    PrintText(String(abs(tOut_int)), abs(nrfRequest.tOut) < 10.0 ? 40 : 15, 30);
-    TFTscreen.setTextSize(3);      // Устанавливаем размер шрифта
-  }
-  if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
-  {
-    if (tOut_int == prev_tOut_int)
+
+    if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
     {
       TFTscreen.setTextColor(BLACK);
+      TFTscreen.setTextSize(3);
       PrintText("." + String(abs(prev_tOut_dec)), abs(prev_tOut_int) < 10 ? 72 : 80, 45);
+
+      TFTscreen.setTextColor(CYAN);
+      PrintText("." + String(abs(tOut_dec)), abs(tOut_int) < 10 ? 72 : 80, 45);
     }
-    TFTscreen.setTextColor(CYAN);
-    PrintText("." + String(abs(tOut_dec)), abs(tOut_int) < 10 ? 72 : 80, 45);
+
     prev_tOut_int = tOut_int;
     prev_tOut_dec = tOut_dec;
+    TFTscreen.setTextSize(3);
   }
 
   if (nrfRequest.p_v != prev_p_v)
