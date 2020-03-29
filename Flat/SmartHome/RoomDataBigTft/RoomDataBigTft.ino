@@ -213,7 +213,7 @@ void setup()
   TFTscreen.width();
   TFTscreen.height();
   TFTscreen.begin();
-  TFTscreen.setRotation(1);  // 0 - Portrait, 1 - Lanscape
+  TFTscreen.setRotation(3);  // 0,2 - Portrait, 1,3 - Lanscape
 
   /*
     Установка цвета фона TFTscreen.background ( r , g , b )
@@ -382,10 +382,10 @@ void DisplayData()
       PrintText("-", abs(prev_tOut_int) < 10 ? 22 : 2, 41);
     }
     TFTscreen.setTextColor(CYAN);
-    if (nrfRequest.tOut < 0)
+    if (tOut_int < 0 || tOut_dec < 0)
     {
       TFTscreen.setTextSize(2);      // Устанавливаем размер шрифта
-      PrintText("-", abs(prev_tOut_int) < 10.0 ? 22 : 2, 41);
+      PrintText("-", abs(tOut_int) < 10.0 ? 22 : 2, 41);
     }
 
     if (tOut_dec != prev_tOut_dec || tOut_int != prev_tOut_int)
@@ -559,12 +559,24 @@ void ShowStatistic()
     case 5: //P
       topVal = maxVal > 252 ? 255 : maxVal + 3;
       baseVal = minVal < 3 ? 0 : minVal - 3;
-      if (topVal - baseVal < 15) //<4.5mm
+      if ((topVal - baseVal) < 30) //<10mm
       {
-        if (baseVal + 15 < 252)
-          topVal = baseVal + 15;
+        int avrgVal = (topVal + baseVal) / 2;
+        if ((avrgVal + 15) > 251)
+        {
+          topVal = 252;
+          baseVal =  topVal - 30;
+        }
+        else if (avrgVal <= 15)
+        {
+          baseVal = 0;
+          topVal = baseVal + 30;
+        }
         else
-          baseVal = topVal - 15;
+        {
+          topVal = avrgVal + 15;
+          baseVal = avrgVal - 15;
+        }
       }
       colorLine = YELLOW;
       break;
