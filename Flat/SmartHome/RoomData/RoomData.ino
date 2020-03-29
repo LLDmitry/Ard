@@ -288,6 +288,7 @@ void RefreshSensorData()
       unsigned int responseHigh = (unsigned int) response[2];
       unsigned int responseLow = (unsigned int) response[3];
       ppm_v = (256 * responseHigh) + responseLow;
+      if (ppm_v < 400) ppm_v = 400;
       Serial.print("co2= ");
       Serial.println(ppm_v);
     }
