@@ -143,8 +143,8 @@ byte h_v = 0;
 float t_inn = 0.0f;
 int ppm_v = 0;
 
-int prev_tOut_int = 0;
-int prev_tOut_dec = 0;
+int prev_tOut_int = 99;
+int prev_tOut_dec =99;
 float prev_t_inn = 0.0f;
 byte prev_h_v = 0;
 int prev_ppm_v = 0;
