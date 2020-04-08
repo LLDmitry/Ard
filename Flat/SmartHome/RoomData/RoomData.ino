@@ -102,15 +102,15 @@ const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
 
 const byte NUMBER_STATISTICS = 60;
 
-const byte BASE_VAL_T_IN = 200;
+const byte BASE_VAL_T_IN = 190;
 const byte BASE_VAL_T_OUT = 0;  //-25
 const byte BASE_VAL_HM_IN = 10;
 const byte BASE_VAL_CO2 = 40;
 const byte BASE_VAL_P = 210;
-const byte TOP_VAL_T_IN = 250;
+const byte TOP_VAL_T_IN = 300;
 const byte TOP_VAL_T_OUT = 250; //+25
 const byte TOP_VAL_HM_IN = 80;
-const byte TOP_VAL_CO2 = 130;
+const byte TOP_VAL_CO2 = 150;
 const byte TOP_VAL_P = 260;
 
 const byte DIFF_VAL_T_IN = 2;
@@ -268,6 +268,7 @@ void RefreshSensorData()
     h_v = dht.readHumidity();
     //Serial.println("readHumidity ");
     t_inn = dht.readTemperature();
+    t_inn = t_inn - 1.5;
     //Serial.println("readTemperature ");
 
     mySerial.write(cmd, 9);
@@ -495,11 +496,34 @@ void ShowStatistic()
       colorLine = YELLOW;
       break;
     case 5: //P
-      //      baseVal = BASE_VAL_P;
-      //      topVal = TOP_VAL_P;
       topVal = maxVal > 252 ? 255 : maxVal + 3;
       baseVal = minVal < 3 ? 0 : minVal - 3;
-      colorLine = CYAN;
+      if ((topVal - baseVal) < 50) //<17mm
+      {
+        int avrgVal = (topVal + baseVal) / 2;
+        if ((avrgVal + 25) > 251)
+        {
+          topVal = 252;
+          baseVal =  topVal - 50;
+        }
+        else if (avrgVal <= 25)
+        {
+          baseVal = 0;
+          topVal = baseVal + 50;
+        }
+        else
+        {
+          topVal = avrgVal + 25;
+          baseVal = avrgVal - 25;
+        }
+        colorLine = CYAN;
+      }
+      else
+      {
+        baseVal = 0;
+        topVal = 255;
+        colorLine = 0x022F;
+      }
       break;
   }
 
@@ -530,15 +554,15 @@ void ShowStatistic()
     {
       byte val1 = values[iprev];
       byte val2 = values[i];
-      byte y1 = bottom - (byte)(k * (val1 - baseVal));
-      byte y2 = bottom - (byte)(k * (val2 - baseVal));
+      int y1 = bottom - (int)(k * (val1 - baseVal));
+      int y2 = bottom - (int)(k * (val2 - baseVal));
       if (y1 > (bottom - 2)) y1 = bottom - 2;
       if (y1 < (bottom - height + 2)) y1 = bottom - height + 2;
       if (y2 > (bottom - 2)) y2 = bottom - 2;
       if (y2 < (bottom - height + 2)) y2 = bottom - height + 2;
       byte x1 = 5 + (x - 1) * 2;
       byte x2 = 5 + x * 2;
-      TFTscreen.drawLine(x1, y1, x2, y2, colorLine);
+      TFTscreen.drawLine(x1, (byte)y1, x2, (byte)y2, colorLine);
 
       //      if (Mode == 5)
       //      {
@@ -669,7 +693,7 @@ byte ConvertToByte(byte mode, float val)
   switch (mode)
   {
     case 1: //T inn от до +30
-      return ((byte)((val-50) * 10));
+      return ((byte)((val - 50) * 10));
       break;
     case 2: //T out  от -32 до +32
       return ((byte)((32 + val) * 4));

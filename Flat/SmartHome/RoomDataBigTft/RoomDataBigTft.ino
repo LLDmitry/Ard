@@ -88,15 +88,15 @@ const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
 
 const byte NUMBER_STATISTICS = 60;
 
-const byte BASE_VAL_T_IN = 200;
+const byte BASE_VAL_T_IN = 190;
 const byte BASE_VAL_T_OUT = 0;  //-25
 const byte BASE_VAL_HM_IN = 10;
 const byte BASE_VAL_CO2 = 40;
 const byte BASE_VAL_P = 210;
-const byte TOP_VAL_T_IN = 250;
+const byte TOP_VAL_T_IN = 300;
 const byte TOP_VAL_T_OUT = 250; //+25
 const byte TOP_VAL_HM_IN = 80;
-const byte TOP_VAL_CO2 = 130;
+const byte TOP_VAL_CO2 = 150;
 const byte TOP_VAL_P = 260;
 
 const byte DIFF_VAL_T_IN = 2;
@@ -144,7 +144,7 @@ float t_inn = 0.0f;
 int ppm_v = 0;
 
 int prev_tOut_int = 99;
-int prev_tOut_dec =99;
+int prev_tOut_dec = 99;
 float prev_t_inn = 0.0f;
 byte prev_h_v = 0;
 int prev_ppm_v = 0;
@@ -502,16 +502,16 @@ void ShowStatistic()
   switch (Mode)
   {
     case 1: //T inn
-      DrawRect(W1 - 1, 0, W2, H1, GREEN, false); //T in
+      DrawRect(W1 - 1, 0, W2, H1, WHITE, false); //T in
       break;
     case 2: //T out
-      DrawRect(0, 0, W1, H1 + H2 - 1, GREEN, false); //T out
+      DrawRect(0, 0, W1, H1 + H2 - 1, WHITE, false); //T out
       break;
     case 4: //CO2
-      DrawRect(W1 + W2 - 2, 0, W3 + 1, H1, GREEN, false); //CO2
+      DrawRect(W1 + W2 - 2, 0, W3 + 1, H1, WHITE, false); //CO2
       break;
     case 5: //P
-      DrawRect(W1 - 1, H1 - 1, W2, H2, GREEN, false); //P
+      DrawRect(W1 - 1, H1 - 1, W2, H2, WHITE, false); //P
       break;
   }
 
@@ -544,6 +544,26 @@ void ShowStatistic()
     case 2: //T out
       topVal = maxVal > 251 ? 255 : maxVal + 4;
       baseVal = minVal < 4 ? 0 : minVal - 4;
+
+//      if ((topVal - baseVal) < 50)
+//      {
+//        int avrgVal = (topVal + baseVal) / 2;
+//        if ((avrgVal + 25) > 251)
+//        {
+//          topVal = 252;
+//          baseVal =  topVal - 50;
+//        }
+//        else if (avrgVal <= 25)
+//        {
+//          baseVal = 0;
+//          topVal = baseVal + 50;
+//        }
+//        else
+//        {
+//          topVal = avrgVal + 25;
+//          baseVal = avrgVal - 25;
+//        }
+//      }
       colorLine = GREEN;
       break;
     case 3: //Влажн
@@ -559,26 +579,32 @@ void ShowStatistic()
     case 5: //P
       topVal = maxVal > 252 ? 255 : maxVal + 3;
       baseVal = minVal < 3 ? 0 : minVal - 3;
-      if ((topVal - baseVal) < 30) //<10mm
+      if ((topVal - baseVal) < 50) //<17mm
       {
         int avrgVal = (topVal + baseVal) / 2;
-        if ((avrgVal + 15) > 251)
+        if ((avrgVal + 25) > 251)
         {
           topVal = 252;
-          baseVal =  topVal - 30;
+          baseVal =  topVal - 50;
         }
-        else if (avrgVal <= 15)
+        else if (avrgVal <= 25)
         {
           baseVal = 0;
-          topVal = baseVal + 30;
+          topVal = baseVal + 50;
         }
         else
         {
-          topVal = avrgVal + 15;
-          baseVal = avrgVal - 15;
+          topVal = avrgVal + 25;
+          baseVal = avrgVal - 25;
         }
+        colorLine = YELLOW;
       }
-      colorLine = YELLOW;
+      else
+      {
+        baseVal = 0;
+        topVal = 255;
+        colorLine = ORANGE;
+      }
       break;
   }
 
@@ -605,21 +631,19 @@ void ShowStatistic()
     {
       byte val1 = values[iprev];
       byte val2 = values[i];
-      byte y1 = (byte)(k * (val1 - baseVal));
+      int y1 = (int)(k * (val1 - baseVal));
 
-      byte y2 = (byte)(k * (val2 - baseVal));
+      int y2 = (int)(k * (val2 - baseVal));
       if (y1 > (HEIGHT_GRAPH - 2)) y1 = HEIGHT_GRAPH - 2;
       if (y1 < 2) y1 = 2;
       if (y2 > (HEIGHT_GRAPH - 2)) y2 = HEIGHT_GRAPH - 2;
       if (y2 < 2) y2 = 2;
       int x1 = 10 + (x - 1) * 5;
       int x2 = 10 + x * 5;
-      TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - y1), x2, (HEIGHT_DISPLAY - y2), colorLine);
+      TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - (byte)y1), x2, (HEIGHT_DISPLAY - (byte)y2), colorLine);
 
-      //TFTscreen.drawLine(x1, (HEIGHT_DISPLAY - prevGraph[x - 1]), x2, (HEIGHT_DISPLAY - prevGraph[x]), BLACK);
-
-      if (x == 1) prevGraph[0] = y1;
-      prevGraph[x] = y2;
+      if (x == 1) prevGraph[0] = (byte)y1;
+      prevGraph[x] = (byte)y2;
     }
     iprev = i;
   }
