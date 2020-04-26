@@ -268,7 +268,7 @@ void RefreshSensorData()
     h_v = dht.readHumidity();
     //Serial.println("readHumidity ");
     t_inn = dht.readTemperature();
-    t_inn = t_inn - 1.5;
+    t_inn = t_inn - 0.5;
     //Serial.println("readTemperature ");
 
     mySerial.write(cmd, 9);
@@ -470,7 +470,7 @@ void ShowStatistic()
 
   switch (Mode)
   {
-    case 1: //T inn -5.0 from real T
+    case 1: //T inn;   realT = val/10 + 5
       topVal = maxVal > 250 ? 255 : maxVal + 5;
       baseVal = minVal > topVal - 30 ? (topVal < 30 ? 0 : topVal - 30) : minVal;
       //baseVal = BASE_VAL_T_IN;
@@ -496,14 +496,14 @@ void ShowStatistic()
       colorLine = YELLOW;
       break;
     case 5: //P
-      topVal = maxVal > 252 ? 255 : maxVal + 3;
-      baseVal = minVal < 3 ? 0 : minVal - 3;
+      topVal = maxVal > 252 ? 255 : (maxVal + 3);
+      baseVal = minVal < 3 ? 0 : (minVal - 3);
       if ((topVal - baseVal) < 50) //<17mm
       {
         int avrgVal = (topVal + baseVal) / 2;
-        if ((avrgVal + 25) > 251)
+        if (avrgVal > (255-25))
         {
-          topVal = 252;
+          topVal = 255;
           baseVal =  topVal - 50;
         }
         else if (avrgVal <= 25)
@@ -692,8 +692,8 @@ byte ConvertToByte(byte mode, float val)
 {
   switch (mode)
   {
-    case 1: //T inn от до +30
-      return ((byte)((val - 50) * 10));
+    case 1: //T inn от +5 до +30.5
+      return ((byte)((val - 5) * 10));
       break;
     case 2: //T out  от -32 до +32
       return ((byte)((32 + val) * 4));
