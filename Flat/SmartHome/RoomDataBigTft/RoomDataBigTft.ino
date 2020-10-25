@@ -228,7 +228,7 @@ void setup()
   DrawRect(0, 0, 320, 240, BLACK, true);
   //DrawRect(0, 0, W1 - 1, H1 - 1, DARK_GREAY, true); //время
 
-  //  wdt_enable(WDTO_8S);
+  wdt_enable(WDTO_8S);
 }
 
 void(* resetFunc) (void) = 0; // объявляем функцию reset с адресом 0

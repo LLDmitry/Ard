@@ -13,6 +13,10 @@ const String Part2Code = "38863bda";
 // "38863bca" - btnCloseCode
 const String Part3Code = "0"; 
 
+const String btnOpenCode = "38863bc2";
+const String btnCloseCode = "38863bca";
+
+
 IRrecv irrecv(RECV_PIN);
 
 decode_results results;
@@ -34,8 +38,8 @@ void loop() {
     String res = String(results.value,HEX);
     Serial.println(res);
     
-    //if (res == Part3Code && resPart1 == Part1Code && resPart2 == Part2Code)
-    if (res == "38863bda") // && resPart1 == "" && resPart2 == "")
+    if (res == Part3Code && resPart1 == Part1Code && resPart2 == Part2Code)
+    //if (res == "38863bda") // && resPart1 == "" && resPart2 == "")
     {
           Serial.println("YES!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
           Serial.println(resPart1);
@@ -47,6 +51,16 @@ void loop() {
     }
     else
     {
+
+      if (res == btnOpenCode)
+      {
+          Serial.println("ZamokOpen");
+      }
+      else if (res == btnCloseCode)
+      {
+          Serial.println("ZamokClose");
+      }
+      
       resPart1 = resPart2;
       resPart2 = res;
     }    
@@ -77,5 +91,3 @@ void BuzzerPulse(int bzMode)
       delay(400);
   }
 }
-
-

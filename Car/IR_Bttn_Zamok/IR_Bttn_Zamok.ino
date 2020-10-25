@@ -133,6 +133,7 @@ void loop()
     Serial.println(res);
     if (setupMode)
     {
+      Serial.println("SetupMode");
       if (res == "38863bda")// && setupPart1 == "" && setupPart2 == "")
       {
         Serial.println("YES!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -160,6 +161,7 @@ void loop()
     }
     else //normal mode
     {
+      Serial.println("NormalMode");
       if (res == IR_OPEN_CODE)
       {
         _delay_ms(DELAY_PERIOD_S * 1000);
@@ -172,6 +174,7 @@ void loop()
       }
       else if (res != "0") //wrong code, do pause
       {
+        Serial.println("WrongCode");
         _delay_ms(5000);
       }
     }
@@ -189,8 +192,9 @@ void loop()
     else if (resultBtnCode == BTN_SETUP_CODE)
       ChangeSetupMode();
     else//wrong code, do pause
+
     {
-      Serial.println("wrong");
+      Serial.println("wrong bttn");
       digitalWrite(BZZ_PIN, HIGH);
       _delay_ms(5000);
       digitalWrite(BZZ_PIN, LOW);
