@@ -23,6 +23,8 @@ const int IR_RECV_PIN = 9;
 
 const String IR_OPEN_CODE = "38863bc2";
 const String IR_CLOSE_CODE = "38863bca";
+const String IR_SETUP_CODE = "38863bda";
+
 const String BTN_OPEN_CODE = "sls"; //s-short, l - long click
 const String BTN_CLOSE_CODE = "lss"; //s-short, l - long click
 const String BTN_SETUP_CODE = "sss"; //s-short, l - long click
@@ -37,8 +39,6 @@ boolean isActiveWork = true;
 boolean prevIgnitionStatus = false;
 String resultBtnCode;
 boolean setupMode = false;
-String setupPart1 = "";
-String setupPart2 = "";
 
 elapsedMillis readBttn_ms;
 elapsedMillis afterSwitchOff_ms;
@@ -131,51 +131,48 @@ void loop()
   {
     String res = String(results.value, HEX);
     Serial.println(res);
-    if (setupMode)
+    if (res != "0")
     {
-      Serial.println("SetupMode");
-      if (res == "38863bda")// && setupPart1 == "" && setupPart2 == "")
+      if (setupMode)
       {
-        Serial.println("YES!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        Serial.println(setupPart1);
-        Serial.println(setupPart2);
-        digitalWrite(BZZ_PIN, HIGH);
-        _delay_ms(500);
-        digitalWrite(BZZ_PIN, LOW);
-        setupPart1 = "";
-        setupPart2 = "";
+        Serial.println("SetupMode");
+        if (res == IR_SETUP_CODE)
+        {
+          Serial.println("YES!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+          digitalWrite(BZZ_PIN, HIGH);
+          _delay_ms(500);
+          digitalWrite(BZZ_PIN, LOW);
+        }
+        else
+        {
+          digitalWrite(BZZ_PIN, HIGH);
+          _delay_ms(50);
+          digitalWrite(BZZ_PIN, LOW);
+        }
+        if (res == IR_OPEN_CODE)
+        {
+          ZamokOpen();
+          ChangeSetupMode(); //проверим и сразу выйдем из сетапа
+        }
       }
-      else
+      else //normal mode
       {
-        setupPart1 = setupPart2;
-        setupPart2 = res;
-        digitalWrite(BZZ_PIN, HIGH);
-        _delay_ms(50);
-        digitalWrite(BZZ_PIN, LOW);
-      }
-      if (res == IR_OPEN_CODE)
-      {
-        ZamokOpen();
-        ChangeSetupMode(); //проверим и сразу выйдем из сетапа
-      }
-    }
-    else //normal mode
-    {
-      Serial.println("NormalMode");
-      if (res == IR_OPEN_CODE)
-      {
-        _delay_ms(DELAY_PERIOD_S * 1000);
-        ZamokOpen();
-      }
-      else if (res == IR_CLOSE_CODE)
-      {
-        _delay_ms(DELAY_PERIOD_S * 1000);
-        ZamokClose();
-      }
-      else if (res != "0") //wrong code, do pause
-      {
-        Serial.println("WrongCode");
-        _delay_ms(5000);
+        Serial.println("NormalMode");
+        if (res == IR_OPEN_CODE)
+        {
+          _delay_ms(DELAY_PERIOD_S * 1000);
+          ZamokOpen();
+        }
+        else if (res == IR_CLOSE_CODE)
+        {
+          _delay_ms(DELAY_PERIOD_S * 1000);
+          ZamokClose();
+        }
+        else  //wrong code, do pause
+        {
+          Serial.println("WrongCode");
+          _delay_ms(5000);
+        }
       }
     }
 
@@ -279,16 +276,26 @@ void ChangeSetupMode()
 {
   setupMode = !setupMode;
 
-  digitalWrite(BZZ_PIN, HIGH);
   if (setupMode)
   {
     Serial.println("SetupMode");
-    _delay_ms(1000);
+    digitalWrite(BZZ_PIN, HIGH);
+    _delay_ms(50);
+    digitalWrite(BZZ_PIN, LOW);
+    _delay_ms(50);
+    digitalWrite(BZZ_PIN, HIGH);
+    _delay_ms(50);
+    digitalWrite(BZZ_PIN, LOW);
+    _delay_ms(50);
+    digitalWrite(BZZ_PIN, HIGH);
+    _delay_ms(50);
+    digitalWrite(BZZ_PIN, LOW);
   }
   else
   {
     Serial.println("ExitSetupMode");
-    _delay_ms(200);
+    digitalWrite(BZZ_PIN, HIGH);
+    _delay_ms(100);
+    digitalWrite(BZZ_PIN, LOW);
   }
-  digitalWrite(BZZ_PIN, LOW);
 }
