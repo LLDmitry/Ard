@@ -49,18 +49,18 @@ char ssid[] = "WFDV";
 char pass[] = "31415926";
 
 const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = 3600;
-const int   daylightOffset_sec = 3600;
+const long gmtOffset_sec = 3600;
+const int  daylightOffset_sec = 3600;
 const byte ROOMS_NUMBER = 7;
 
 byte sets_temp[5] = {2, 15, 20, 23, 25};
 enum homeMode_enum {WAIT_MODE, STOP_MODE, HOME_MODE, GUESTS_MODE, NIGHT_MODE};
 byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] sets_temp[i]; 0-выключить, 100-не менять
-  {1, 2, 2, 3, 1, 1, 1},  //дома
-  {1, 0, 0, 0, 0, 0, 0},  //стоп
-  {1, 0, 1, 0, 0, 0, 0},  //ушел
+  {1, 0, 1, 0, 0, 0, 0},        //ушел
+  {1, 2, 2, 3, 1, 1, 1},        //дома
   {2, 2, 4, 4, 100, 100, 100},  //ночь
-  {1, 2, 2, 3, 4, 4, 4},  //гости
+  {1, 2, 2, 3, 4, 4, 4},        //гости
+  {1, 0, 0, 0, 0, 0, 0},        //стоп
 };
 homeMode_enum homeMode;
 homeMode_enum homeModeSwitch;
@@ -75,7 +75,7 @@ volatile float t_out;
 volatile float t_in_room[ROOMS_NUMBER];
 volatile byte heat_status_room[ROOMS_NUMBER]; //0-off, 1-on, 2-on in progress; 3-err
 volatile byte heat_control_room[ROOMS_NUMBER]; //0-off, 1-on
-volatile byte set_temp_room[ROOMS_NUMBER]; //degrees C
+volatile byte set_temp_room[ROOMS_NUMBER];
 volatile byte currentRoom;
 
 void setup()
@@ -111,9 +111,9 @@ void changeHomeMode()
   Serial.print("changeHomeMode = ");
   Serial.println(homeMode);
   for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
-    if (defaultTemp[homeMode][i] != 100 && set_temp_room[i] != defaultTemp[homeMode][i])
+    if (defaultTemp[homeMode - 1][i] != 100 && set_temp_room[i] != defaultTemp[homeMode - 1][i])
     {
-      set_temp_room[i] = defaultTemp[homeMode][i];
+      set_temp_room[i] = defaultTemp[homeMode - 1][i];
       Serial.print("room ");
       Serial.println(i);
       Serial.print("set_temp_room=");
@@ -134,7 +134,7 @@ void changeHomeMode()
 
 void displayCurrentRoomTemperatureSet()
 {
-  Blynk.virtualWrite(VP_ROOM_TMP_SET, set_temp_room[currentRoom]);
+  Blynk.virtualWrite(VP_ROOM_TMP_SET, set_temp_room[currentRoom - 1]);
   //  for (int i = 0; i <= 5; i++) {
   //    if (set_temp_room[currentRoom] <= sets_temp[i])
   //    {
@@ -145,7 +145,7 @@ void displayCurrentRoomTemperatureSet()
 
 void displayCurrentRoomHeatBtn()
 {
-  Blynk.virtualWrite(VP_ROOM_HEAT_BTN, heat_control_room[currentRoom]);
+  Blynk.virtualWrite(VP_ROOM_HEAT_BTN, heat_control_room[currentRoom - 1]);
 }
 
 
@@ -154,15 +154,16 @@ BLYNK_WRITE(VP_TMP_BTN_REFRESH)
   int btnVal = param.asInt();
   if (btnVal == HIGH)
   {
-    refreshTemperatures(true);
+    refreshTemperature(true);
   }
 }
 
 void refreshAllTemperatures() {
-  refreshTemperatures(true);
+  refreshTemperature(true);
 }
 
-void refreshTemperatures(bool allRooms) {
+void refreshTemperature(bool allRooms) {
+  Serial.println("refreshTemperatures");
   t_out = random(-20, 35);
   t_in = random(-5, 35);
   Blynk.virtualWrite(VP_TMP_OUT, t_out);
@@ -177,17 +178,17 @@ void refreshTemperatures(bool allRooms) {
   }
   else
   {
-    t_in_room[currentRoom] = random(-5, 35);
+    t_in_room[currentRoom - 1] = random(-5, 35);
   }
 
+  setRoomHeatStatus(allRooms);
   displayCurrentRoomInfo();
-  Serial.println("refreshTemperatures");
 }
 
 BLYNK_WRITE(VP_ROOM_SELECT)
 {
   currentRoom = param.asInt();
-  refreshTemperatures(false);
+  //refreshTemperature(false);
   displayCurrentRoomTemperatureSet();
   displayCurrentRoomHeatBtn();
   Serial.println("Room=" + currentRoom);
@@ -195,11 +196,17 @@ BLYNK_WRITE(VP_ROOM_SELECT)
 
 BLYNK_WRITE(VP_ROOM_HEAT_BTN)
 {
-  heat_control_room[currentRoom] = param.asInt();
-  Serial.print("currentRoom=");
-  Serial.println(currentRoom);
-  Serial.println("heat_control_room = ");
-  Serial.println(heat_control_room[currentRoom]);
+  if (param.asInt() == 1 && set_temp_room[currentRoom - 1] == 0) //try to push but T was not selected before -> unpush
+  {
+    Blynk.virtualWrite(VP_ROOM_HEAT_BTN, LOW);
+    return;
+  }
+
+  heat_control_room[currentRoom - 1] = param.asInt();
+  //  Serial.print("currentRoom=");
+  //  Serial.println(currentRoom);
+  //  Serial.println("heat_control_room = ");
+  //  Serial.println(heat_control_room[currentRoom - 1]);
   setRoomHeatStatus(false);
 }
 
@@ -237,23 +244,45 @@ BLYNK_WRITE(VP_AUTO_NIGHT_BTN)
 
 void setRoomHeatStatus(bool allRooms)
 {
+  Serial.println("setRoomHeatStatus");
   if (allRooms)
   {
     for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
       heat_status_room[i] = heat_control_room[i];
+      if (checkHeatSwitch(i + 1))
+      {
+        heat_status_room[i] = 2;
+      }
     }
   }
   else
   {
-    heat_status_room[currentRoom] = heat_control_room[currentRoom];
+    heat_status_room[currentRoom - 1] = heat_control_room[currentRoom - 1];
+    if (checkHeatSwitch(currentRoom))
+    {
+      heat_status_room[currentRoom - 1] = 2;
+    }
   }
   displayCurrentRoomInfo();
 }
 
+bool checkHeatSwitch(byte room)
+{
+  if (room == 1)
+  {
+    Serial.println("checkHeatSwitch");
+    Serial.print("t_in_room ");
+    Serial.println(t_in_room[room - 1]);
+    Serial.print("set_temp_room ");
+    Serial.println(set_temp_room[room - 1]);
+  }
+  return (heat_status_room[room - 1] == 1 && t_in_room[room - 1] < sets_temp[set_temp_room[room - 1] - 1]); //включить нагрев
+}
+
 BLYNK_WRITE(VP_ROOM_TMP_SET)
 {
-  set_temp_room[currentRoom] = param.asInt();
-  heat_control_room[currentRoom] = 1;
+  set_temp_room[currentRoom - 1] = param.asInt();
+  heat_control_room[currentRoom - 1] = 1;
   setRoomHeatStatus(false);
   displayCurrentRoomHeatBtn();
 }
@@ -261,9 +290,9 @@ BLYNK_WRITE(VP_ROOM_TMP_SET)
 void displayCurrentRoomInfo()
 {
   Serial.print("displayCurrentRoomInfo ");
-  Serial.println(heat_status_room[currentRoom]);
-  Blynk.virtualWrite(VP_ROOM_TMP, t_in_room[currentRoom]);
-  switch (heat_status_room[currentRoom])
+  Serial.println(heat_status_room[currentRoom - 1]);
+  Blynk.virtualWrite(VP_ROOM_TMP, t_in_room[currentRoom - 1]);
+  switch (heat_status_room[currentRoom - 1])
   {
     case 0:
       Blynk.setProperty(VP_ROOM_TMP, "color", "#0047AB");
@@ -280,7 +309,7 @@ void displayCurrentRoomInfo()
       Blynk.virtualWrite(VP_ROOM_HEAT_BTN, LOW);
       break;
   }
-  Blynk.virtualWrite(VP_ROOM_TMP, t_in_room[currentRoom]);
+  Blynk.virtualWrite(VP_ROOM_TMP, t_in_room[currentRoom - 1]);
 }
 
 BLYNK_CONNECTED()
