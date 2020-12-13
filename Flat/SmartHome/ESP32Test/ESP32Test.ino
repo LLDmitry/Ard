@@ -4,6 +4,8 @@
 #include <WiFiClient.h>
 #include <BlynkSimpleEsp32.h>
 #include "time.h"
+#include <ArduinoJson.h>
+
 /* Set this to a bigger number, to enable sending longer messages */
 //#define BLYNK_MAX_SENDBYTES 128
 
@@ -49,8 +51,14 @@ char ssid[] = "WFDV";
 char pass[] = "31415926";
 
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 3600;
-const int  daylightOffset_sec = 3600;
+const long gmtOffset_sec = 3600 * 3;
+const int  daylightOffset_sec = 3600 * 3;
+
+const char *weatherHost = "api.openweathermap.org";
+String APIKEY = "c536de4ac23e5608ec8a62e5e0744ed8";        // Чтобы получить API ключ, перейдите по ссылке http://openweathermap.org/api
+String weatherLang = "&lang=ru";
+String cityID = "482443"; //Токсово
+
 const byte ROOMS_NUMBER = 7;
 
 byte sets_temp[5] = {2, 15, 20, 23, 25};
@@ -78,6 +86,25 @@ volatile byte heat_control_room[ROOMS_NUMBER]; //0-off, 1-on
 volatile byte set_temp_room[ROOMS_NUMBER];
 volatile byte currentRoom;
 
+int cntFailedWeather = 0;  // Счетчик отсутстия соединения с сервером погоды
+String weatherMain = "";
+String weatherDescription = "";
+String weatherLocation = "";
+String country;
+int humidity;
+int pressure;
+float temp;
+float tempMin, tempMax;
+int clouds;
+float windSpeed;
+String date;
+String currencyRates;
+String weatherString;
+int windDeg;
+String windDegString;
+String cloudsString;
+String firstString;
+
 void setup()
 {
   // Debug console
@@ -90,7 +117,11 @@ void setup()
   // Just put the recepient's "e-mail address", "Subject" and the "message body"
   Blynk.email("LLDmitry@yandex.ru", "Subject", "My Blynk project is online!.");
 
+  // Get the NTP time
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   refreshLocalTime();
+
+  getWeatherData();
 
   //String sTime = &timeinfo, "%A, %B %d %Y %H:%M:%S";
   Blynk.notify("Device started at ");
@@ -188,7 +219,6 @@ void refreshTemperature(bool allRooms) {
 BLYNK_WRITE(VP_ROOM_SELECT)
 {
   currentRoom = param.asInt();
-  //refreshTemperature(false);
   displayCurrentRoomTemperatureSet();
   displayCurrentRoomHeatBtn();
   Serial.println("Room=" + currentRoom);
@@ -436,7 +466,87 @@ byte getValue(String key)
   return key.substring(5).toInt();
 }
 
+void getWeatherData() //client function to send/receive GET request data.
+{
+  String result = "";
+  WiFiClient client;
+  const int httpPort = 80;
+  if (!client.connect(weatherHost, httpPort)) {
+    Serial.println("connection to openweather failed");
+    cntFailedWeather++;
+    return;
+  }
+  else {
+    Serial.println("connection to openweather ok");
+    cntFailedWeather = 0;
+  }
+  // We now create a URI for the request
+  String url = "/data/2.5/weather?id=" + cityID + "&units=metric&cnt=1&APPID=" + APIKEY + weatherLang;
 
+  // This will send the request to the server
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: " + weatherHost + "\r\n" +
+               "Connection: close\r\n\r\n");
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 5000) {
+      client.stop();
+      return;
+    }
+  }
+
+  // Read all the lines of the reply from server
+  while (client.available()) {
+    result = client.readStringUntil('\r');
+  }
+
+  result.replace('[', ' ');
+  result.replace(']', ' ');
+
+  char jsonArray [result.length() + 1];
+  result.toCharArray(jsonArray, sizeof(jsonArray));
+  jsonArray[result.length() + 1] = '\0';
+
+  StaticJsonBuffer<1024> json_buf;
+  JsonObject &root = json_buf.parseObject(jsonArray);
+  if (!root.success())
+  {
+    Serial.println("parseObject() failed");
+  }
+
+  weatherMain = root["weather"]["main"].as<String>();
+  weatherDescription = root["weather"]["description"].as<String>();
+  weatherDescription.toLowerCase();
+  weatherLocation = root["name"].as<String>();
+  country = root["sys"]["country"].as<String>();
+  temp = root["main"]["temp"];
+  humidity = root["main"]["humidity"];
+  pressure = root["main"]["pressure"];
+
+  windSpeed = root["wind"]["speed"];
+
+  clouds = root["main"]["clouds"]["all"];
+  String deg = String(char('~' + 25));
+  weatherString =  "  Температура " + String(temp, 1) + "'C ";
+
+  weatherString += " Влажность " + String(humidity) + "% ";
+  weatherString += " Давление " + String(int(pressure / 1.3332239)) + "ммРтСт ";
+
+
+
+  weatherString += " Ветер " + String(windSpeed, 1) + "м/с   ";
+
+  if (clouds <= 10) cloudsString = "   Ясно";
+  if (clouds > 10 && clouds <= 30) cloudsString = "   Малооблачно";
+  if (clouds > 30 && clouds <= 70) cloudsString = "   Средняя облачность";
+  if (clouds > 70 && clouds <= 95) cloudsString = "   Большая облачность";
+  if (clouds > 95) cloudsString = "   Пасмурно";
+
+  weatherString += cloudsString;
+
+  Serial.println(weatherString);
+
+}
 
 void loop()
 {
