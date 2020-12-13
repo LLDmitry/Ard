@@ -1,14 +1,15 @@
 //BALKON
 #include "DHT.h"
-#include "TM1637.h"          // Библиотека дисплея 
+#include <TM1637.h>          // Библиотека дисплея 
 #include <elapsedMillis.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <avr/wdt.h>
 
-#define ONE_WIRE_PIN 3   // DS18b20
+#define ONE_WIRE_PIN 5   // DS18b20
 #define VENT_PIN 2     // вентилятор
-#define CLK 5 // К этому пину подключаем CLK дисплея
-#define DIO 6 // К этому пину подключаем DIO дисплея
+#define CLK 3 // К этому пину подключаем CLK дисплея
+#define DIO 4 // К этому пину подключаем DIO дисплея
 #define TERMO_PIN 13     // нагревательный элемент
 
 #define DHTTYPE DHT11
@@ -54,6 +55,8 @@ const unsigned long PAUSE_VENT_S = 3600;  //1 час  периодически (
 const unsigned long PERIOD_STATISTIC_S = 10800; //3ч период сбора анализа % работы нагрева
 
 void setup() {
+  // immediately disable watchdog timer so set will not get interrupted
+  wdt_disable();
 
   pinMode(TERMO_PIN, OUTPUT);
 
@@ -68,6 +71,9 @@ void setup() {
   sensors.getAddress(outerTempDeviceAddress, 0);
   sensors.setResolution(innerTempDeviceAddress, 11);  //9 bits 0.5°C ; 10 bits 0.25°C ; 11 bits 0.125°C ; 12 bits  0.0625°C
   sensors.setResolution(outerTempDeviceAddress, 11);
+
+  // enable the watchdog timer. There are a finite number of timeouts allowed (see wdt.h).
+  wdt_enable(WDTO_4S);
 }
 
 void TermoControl()
@@ -94,7 +100,7 @@ void TermoControl()
 
 void VentControl()
 {
-  if (TermoOn == 1 || lastTermoOff_ms < VENT_WORK_AFTER_NAGREV_S * 1000)  //при нагреве всегда сразу включать вент, а выключть через VENT_WORK_AFTER_NAGREV_S после окончания нагрева
+  if (TermoOn == 1 || lastTermoOff_ms < VENT_WORK_AFTER_NAGREV_S * 1000)  //при нагреве всегда сразу включать вент, а выключть через VENT_WORK_AFTER_NAGREV_S после окончания нагрева из-за инерции нагревателя
   {
     VentOn = 1;
     // Serial.println("TermoOn1");
@@ -153,54 +159,56 @@ void AutoChangeShowMode(bool needRefresh)
     tm1637.clearDisplay();
     switch (ShowMode)
     {
-    case 1:     //внутр T
-      if (TermoOn == 1)
-        tm1637.set(7);    // яркость от 0 до 7
-      else
-        tm1637.set(1);    // яркость от 0 до 7
-      tm1637.display(FormatDisplay(t_in));
-      if (abs((int)(t_in * 10.0)) <= 9)  //<=0.9c
-        tm1637.display(2, 0);
-      tm1637.display(0, 10);
-      if (t_in < 0)
-        tm1637.display(1, 16);
-      if (abs((int)(t_in * 10.0)) <= 99)  //<=9.9c
-      {
-        tm1637.display(3, 99); //мигнем последним разрядом - признак что это десятые градуса
-        delay(200);
+      case 1:     //внутр T
+        if (TermoOn == 1)
+          tm1637.set(7);    // яркость от 0 до 7
+        else
+          tm1637.set(1);    // яркость от 0 до 7
         tm1637.display(FormatDisplay(t_in));
-        tm1637.display(0, 10);
         if (abs((int)(t_in * 10.0)) <= 9)  //<=0.9c
-          tm1637.display(2, 0);       
+          tm1637.display(2, 0);
+        tm1637.display(0, 10);
         if (t_in < 0)
           tm1637.display(1, 16);
-      }
-      break;
-    case 2:     //внеш T
-      tm1637.set(1);    // яркость от 0 до 7
-      tm1637.display(FormatDisplay(t_out));
-      if (abs((int)(t_out * 10.0)) <= 9)  //<=0.9c
-        tm1637.display(2, 0);
-      tm1637.display(0, 11);
-      if (t_out < 0)
-        tm1637.display(1, 16);
-      if (abs((int)(t_out * 10.0)) <= 99) //<=9.9c
-      {
-        tm1637.display(3, 99); //мигнем последним разрядом - признак что это десятые градуса
-        delay(200);
+        if (abs((int)(t_in * 10.0)) <= 99)  //<=9.9c
+        {
+          tm1637.display(3, 99); //мигнем последним разрядом - признак что это десятые градуса
+          delay(200);
+          tm1637.display(FormatDisplay(t_in));
+          tm1637.display(0, 10);
+          if (abs((int)(t_in * 10.0)) <= 9)  //<=0.9c
+            tm1637.display(2, 0);
+          if (t_in < 0)
+            tm1637.display(1, 16);
+        }
+        break;
+      case 2:     //внеш T
+        tm1637.set(1);    // яркость от 0 до 7
         tm1637.display(FormatDisplay(t_out));
         if (abs((int)(t_out * 10.0)) <= 9)  //<=0.9c
           tm1637.display(2, 0);
         tm1637.display(0, 11);
         if (t_out < 0)
           tm1637.display(1, 16);
-      }
-      break;
-    case 3:     //% работы нагрева за предыдущие 3ч
-      tm1637.set(1);    // яркость от 0 до 7
-      tm1637.display(int((totalStatisticNagrev * 100) / PERIOD_STATISTIC_S ));
-      tm1637.display(0, 12);
-      break;
+        if (abs((int)(t_out * 10.0)) <= 99) //<=9.9c
+        {
+          tm1637.display(3, 99); //мигнем последним разрядом - признак что это десятые градуса
+          delay(200);
+          tm1637.display(FormatDisplay(t_out));
+          if (abs((int)(t_out * 10.0)) <= 9)  //<=0.9c
+            tm1637.display(2, 0);
+          tm1637.display(0, 11);
+          if (t_out < 0)
+            tm1637.display(1, 16);
+        }
+        break;
+      case 3:     //% работы нагрева за предыдущие 3ч
+        tm1637.set(1);    // яркость от 0 до 7
+        Serial.print("totalStatisticNagrev ");
+        Serial.println(totalStatisticNagrev * 100);
+        tm1637.display(int((totalStatisticNagrev * 100) / PERIOD_STATISTIC_S ));
+        tm1637.display(0, 12);
+        break;
     }
   }
 }
@@ -258,4 +266,5 @@ void loop()
   GetStatistic();
 
   AutoChangeShowMode(false);
+  wdt_reset();
 }

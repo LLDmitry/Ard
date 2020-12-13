@@ -27,7 +27,7 @@
 #define RNF_MISO      12
 #define RNF_SCK       13
 
-const byte ROOM_NUMBER = ROOM_VANNA2; //ROOM_VANNA1
+const byte ROOM_NUMBER = ROOM_VANNA1; //ROOM_VANNA2
 const boolean SOLENOID_NORMAL_OPENED = false; //true
 
 const unsigned long MANUAL_OPEN_DURATION_SEC = 10800; //3 hours
@@ -316,9 +316,9 @@ void ReadCommandNRF()
           radio.powerDown();
           radio.powerUp();
         }
-//        if (nrfRequest.Command != RQ_NO) {
-//          HandleInputNrfCommand(); //closeVoda?
-//        };
+        //        if (nrfRequest.Command != RQ_NO) {
+        //          HandleInputNrfCommand(); //closeVoda?
+        //        };
 
         nrfResponse.Command == RSP_NO;
         nrfResponse.tOut = 99.9;

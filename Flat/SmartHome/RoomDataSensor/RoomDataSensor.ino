@@ -1,4 +1,5 @@
 //Room data modified (get T_out and p_v, send CO2)
+//ток потребления в спящем режиме 25mkA
 //Аппаратный SPI  http://www.poprobot.ru/home/Arduino-TFT-SPI  http://robotchip.ru/podklyuchenie-tft-displeya-1-8-k-arduino/
 //Как известно, Arduino имеет встроенный аппаратный SPI. На Arduino Nano для этого используются выводы с 10 по 13.
 //TFT: https://www.arduino.cc/en/Guide/TFT

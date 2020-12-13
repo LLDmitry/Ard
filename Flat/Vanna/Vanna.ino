@@ -7,8 +7,9 @@
 #include <avr/wdt.h>
 
 const int DHT_PIN = 4;
-const int BTN_PIN = 13;
+const int BTN_PIN = 15; //A1
 const int PIR_PIN = 2;
+const int LIGHT_PIN = A0;
 const int VENT_PIN = 5;
 const int BUZZ_PIN = 6;
 const int LAMP_PIN = 3;
@@ -22,16 +23,21 @@ const unsigned long MANUAL_LONG_ON_DURATION_SEC = 1800; //30 minute
 const unsigned long AUTO_LONG_ON_DURATION_SEC = 600; //10 minute
 const unsigned long CHECK_HUMIDITY_PERIOD_SEC = 30;
 const unsigned long PERIOD_BASE_HUMIDITY_LEVEL_SEC = 36000; //10 hours
+const unsigned long LAMP_ON_SEC = 120;
 
-SButton btnVent(BTN_PIN, 50, 700, 3000, 10000);
+const int LIGHT_LEVEL = 200;
+
+SButton btnVent(BTN_PIN, 50, 1000, 5000, 20000);
 elapsedMillis ventOn_ms;
 elapsedMillis checkHumidity_ms = CHECK_HUMIDITY_PERIOD_SEC * 1000;
 elapsedMillis periodBaseHumidityLevel_ms = PERIOD_BASE_HUMIDITY_LEVEL_SEC * 1000;
+elapsedMillis lampOn_ms;
 
 int avgHumidity = 70;
 int baseHumidityLevel = 70; //minimum average for the last several hours
 int minAvgHumidityLevel = 70;
 boolean ventOn = false;
+boolean prevPir = false;
 int ventMode = 0;  //0-off, 1-humidityOn, 2-manualShortOn, 3-manualLongOn
 
 DHT dht(DHT_PIN, DHTTYPE);
@@ -43,11 +49,13 @@ void setup()
 
   dht.begin();
 
-  pinMode(BTN_PIN, INPUT);
+  pinMode(BTN_PIN, INPUT_PULLUP);
   pinMode(VENT_PIN, OUTPUT);
   pinMode(BUZZ_PIN, OUTPUT);
   pinMode(PIR_PIN, INPUT);
+  pinMode(LIGHT_PIN, INPUT_PULLUP);
   pinMode(LAMP_PIN, OUTPUT);
+  pinMode(13, OUTPUT);
   Serial.begin(9600);   // Debugging only
   Serial.println("setup");
 
@@ -90,6 +98,7 @@ void loop()
   VentControl(0);
   CheckHumidity();
   LampControl();
+  delay(100);
   wdt_reset();
 }
 
@@ -105,12 +114,14 @@ void CheckHumidity()
       ventOn = true;
       ventOn_ms = 0;
       ventMode = 1;
+      Serial.println("VentOn");
       switchVent();
     }
     else if (ventMode == 1 && (avgHumidity < baseHumidityLevel || avgHumidity < OFF_HUMIDITY_LEVEL || baseHumidityLevel > ON_HUMIDITY_LEVEL))
     {
       ventOn = false;
       ventMode = 0;
+      Serial.println("VentOff");
       switchVent();
     };
     checkHumidity_ms = 0;
@@ -130,7 +141,7 @@ void VentControl(int typeControl) //0 - auto check, 1-short click, 2-long click,
         {
           ventMode = 0;
           ventOn = false;
-          switchVent();
+          Serial.println("VentOff");
         }
       }
       switchVent();
@@ -142,11 +153,13 @@ void VentControl(int typeControl) //0 - auto check, 1-short click, 2-long click,
         ventMode = (typeControl == 1 ? 2 : 3);
         ventOn_ms = 0;
         ventOn = true;
+        Serial.println("VentOn");
       }
       else //выключить если был включен мануально
       {
         ventMode = 0;
         ventOn = false;
+        Serial.println("VentOff");
       }
       if (typeControl == 2)
       {
@@ -157,13 +170,13 @@ void VentControl(int typeControl) //0 - auto check, 1-short click, 2-long click,
       switchVent();
       break;
     case 3: //play beeps with base_humidity and current_humidity
-      digitalWrite(BUZZ_PIN, HIGH);
-      delay(200);
-      digitalWrite(BUZZ_PIN, LOW);
+      //digitalWrite(BUZZ_PIN, HIGH);
+      //delay(500);
+      //digitalWrite(BUZZ_PIN, LOW);
       ventMode = 0; //off vent for silent
       ventOn = false;
       switchVent();
-      delay(1500);
+      delay(500);
       PlayHumidity();
       break;
   }
@@ -237,5 +250,20 @@ void PlayDigitBeeps(int val)
 
 void LampControl()
 {
-  digitalWrite(LAMP_PIN, digitalRead(PIR_PIN));
+  bool lampMode = false;
+  //включить от PIR только если темно (не включен свет выключателем)
+  if (analogRead(LIGHT_PIN) > LIGHT_LEVEL && digitalRead(PIR_PIN) == HIGH && !prevPir)
+  {
+    Serial.println("PIR On");
+    lampMode = true;
+    lampOn_ms = 0;
+  }
+  else
+  {
+    lampMode = (lampOn_ms < LAMP_ON_SEC * 1000);
+  }
+  prevPir = (digitalRead(PIR_PIN) == HIGH);
+
+  digitalWrite(LAMP_PIN, lampMode);
+  digitalWrite(13, lampMode);
 }
