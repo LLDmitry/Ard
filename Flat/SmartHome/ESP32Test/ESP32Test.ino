@@ -37,8 +37,10 @@
 
 #define VP_SETTINGS_TXT     V50
 #define VP_TERMINAL         V51
-#define VP_AUTO_NIGHT_BTN   V55
 #define VP_SHOW_SETTINGS_BTN    V56
+#define VP_AUTO_NIGHT_BTN   V57
+#define VP_AUTO_NIGHT_START V58
+#define VP_AUTO_NIGHT_STOP  V59
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
@@ -62,7 +64,7 @@ String cityID = "482443"; //Токсово
 const byte ROOMS_NUMBER = 7;
 
 byte sets_temp[5] = {2, 15, 20, 23, 25};
-enum homeMode_enum {WAIT_MODE, STOP_MODE, HOME_MODE, GUESTS_MODE, NIGHT_MODE};
+enum homeMode_enum {NO_MODE, WAIT_MODE, HOME_MODE, NIGHT_MODE, GUESTS_MODE, STOP_MODE};
 byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] sets_temp[i]; 0-выключить, 100-не менять
   {1, 0, 1, 0, 0, 0, 0},        //ушел
   {1, 2, 2, 3, 1, 1, 1},        //дома
@@ -71,11 +73,12 @@ byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3
   {1, 0, 0, 0, 0, 0, 0},        //стоп
 };
 homeMode_enum homeMode;
-homeMode_enum homeModeSwitch;
+homeMode_enum homeModeBeforeNight;
 
 unsigned count = 0;
 BlynkTimer timer;
 WidgetTerminal terminal(VP_TERMINAL);
+struct tm timeinfo;
 
 volatile float t_in;
 volatile float t_out;
@@ -85,6 +88,13 @@ volatile byte heat_status_room[ROOMS_NUMBER]; //0-off, 1-on, 2-on in progress; 3
 volatile byte heat_control_room[ROOMS_NUMBER]; //0-off, 1-on
 volatile byte set_temp_room[ROOMS_NUMBER];
 volatile byte currentRoom;
+
+long timeStartNightSec;
+long timeStopNightSec;
+bool allowAuthoNight;
+int tMinute;
+int tHour;
+bool freshTime;
 
 int cntFailedWeather = 0;  // Счетчик отсутстия соединения с сервером погоды
 String weatherMain = "";
@@ -119,27 +129,29 @@ void setup()
 
   // Get the NTP time
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  refreshLocalTime();
+
+  everyHourTimer();
+  everyMinuteTimer();
 
   getWeatherData();
 
   //String sTime = &timeinfo, "%A, %B %d %Y %H:%M:%S";
-  Blynk.notify("Device started at ");
+  Blynk.notify("Device started ");
 
-  timer.setInterval(60000L, refreshAllTemperatures);
+  timer.setInterval(600000L, refreshAllTemperatures); //10minutes
+  timer.setInterval(3600000L, everyHourTimer);
+  timer.setInterval(60000L, everyMinuteTimer);
 }
 
 BLYNK_WRITE(VP_MODE)
 {
-  //homeModeSwitch = (homeMode_enum)param.asInt();
-  homeMode = (homeMode_enum)param.asInt();
-  changeHomeMode();
+  changeHomeMode((homeMode_enum)param.asInt(), false);
 }
 
-void changeHomeMode()
+void changeHomeMode(homeMode_enum newHomeMode, bool authoChange)
 {
-  //homeMode = homeModeSwitch;
   Serial.print("changeHomeMode = ");
+  homeMode = newHomeMode;
   Serial.println(homeMode);
   for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
     if (defaultTemp[homeMode - 1][i] != 100 && set_temp_room[i] != defaultTemp[homeMode - 1][i])
@@ -160,6 +172,10 @@ void changeHomeMode()
       displayCurrentRoomTemperatureSet();
       displayCurrentRoomHeatBtn();
     }
+  }
+  if (authoChange)
+  {
+    Blynk.virtualWrite(VP_MODE, homeMode);
   }
 }
 
@@ -192,6 +208,53 @@ BLYNK_WRITE(VP_TMP_BTN_REFRESH)
 void refreshAllTemperatures() {
   refreshTemperature(true);
 }
+
+void everyMinuteTimer() {
+  if (!freshTime)
+  {
+    Serial.println("             everyMinuteTimer");
+    tMinute += 1;
+    if (tMinute == 60)
+    {
+      tHour += 1;
+      tMinute = 0;
+    }
+    if (tHour == 24)
+    {
+      tHour = 0;
+    }
+    Serial.println(tHour);
+    Serial.println(tMinute);
+  }
+
+  checkTimer();
+  freshTime = false;
+}
+
+void checkTimer() {
+  Serial.println("checkTimer");
+  long nowSec = 3600 * tHour + 60 * tMinute;
+  Serial.println(nowSec);
+  if (allowAuthoNight && (homeMode == HOME_MODE || homeMode == GUESTS_MODE) && nowSec == timeStartNightSec)
+  {
+    Serial.println("START NIGHT");
+    homeModeBeforeNight = homeMode;
+    changeHomeMode(NIGHT_MODE, true);
+  }
+
+  if (homeMode == NIGHT_MODE && nowSec == timeStopNightSec)
+  {
+    Serial.println("STOP NIGHT");
+    changeHomeMode(homeModeBeforeNight, true);
+  }
+}
+
+void everyHourTimer() {
+  Serial.println("             everyHourTimer");
+  refreshLocalTime();
+  freshTime = true;
+}
+
 
 void refreshTemperature(bool allRooms) {
   Serial.println("refreshTemperatures");
@@ -265,11 +328,31 @@ BLYNK_WRITE(VP_SHOW_SETTINGS_BTN)
 
 BLYNK_WRITE(VP_AUTO_NIGHT_BTN)
 {
-  if (param.asInt())
+  allowAuthoNight = param.asInt();
+  if (allowAuthoNight)
     terminal.println("VP_AUTO_NIGHT_BTN On");
   else
     terminal.println("VP_AUTO_NIGHT_BTN Off");
   terminal.flush();
+
+  Blynk.setProperty(VP_AUTO_NIGHT_START, "color", allowAuthoNight ? "#6b8e23" : "#877994");
+  Blynk.setProperty(VP_AUTO_NIGHT_STOP, "color", allowAuthoNight ? "#6b8e23" : "#877994");
+}
+
+BLYNK_WRITE(VP_AUTO_NIGHT_START)
+{
+  timeStartNightSec = param[0].asLong();
+  Serial.println(timeStartNightSec);
+  // terminal.println(sec);
+  //terminal.flush();
+}
+
+BLYNK_WRITE(VP_AUTO_NIGHT_STOP)
+{
+  timeStopNightSec = param[0].asLong();
+  Serial.println(timeStopNightSec);
+  //terminal.println(sec);
+  //terminal.flush();
 }
 
 void setRoomHeatStatus(bool allRooms)
@@ -355,12 +438,26 @@ BLYNK_READ(VP_TMP_BTN_REFRESH)
 
 void refreshLocalTime()
 {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("Failed to obtain time");
-    return;
+  for (int i = 1; i <= 3; i++) {
+    if (!getLocalTime(&timeinfo)) {
+      Serial.println("Failed to obtain time");
+      if (i == 3)
+        return;
+    }
+    else
+      break;
   }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+
+  time_t now;
+  time(&now);
+  long g = now;
+  Serial.println(now);
+
+  Serial.println(timeinfo.tm_hour);
+  Serial.println(timeinfo.tm_min);
+  Serial.println(timeinfo.tm_sec);
+  tHour = timeinfo.tm_hour;
+  tMinute = timeinfo.tm_min;
 }
 
 //уст
@@ -545,6 +642,9 @@ void getWeatherData() //client function to send/receive GET request data.
   weatherString += cloudsString;
 
   Serial.println(weatherString);
+
+  terminal.print("Weather: ");
+  terminal.println(weatherString);
 
 }
 
