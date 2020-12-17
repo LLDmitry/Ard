@@ -45,8 +45,7 @@
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
 // Go to the Project Settings (nut icon).
-char auth[] = "lxj-qafnfidshbCxIrGHQ4A12NZd2G4G";
-
+char blynkToken[] = "lxj-qafnfidshbCxIrGHQ4A12NZd2G4G";
 // Your WiFi credentials.
 // Set password to "" for open networks.
 char ssid[] = "WFDV";
@@ -79,6 +78,9 @@ unsigned count = 0;
 BlynkTimer timer;
 WidgetTerminal terminal(VP_TERMINAL);
 struct tm timeinfo;
+
+bool isWiFiConnected = false;
+int numTimerReconnect = 0;
 
 volatile float t_in;
 volatile float t_out;
@@ -119,7 +121,26 @@ void setup()
 {
   // Debug console
   Serial.begin(9600);
-  Blynk.begin(auth, ssid, pass);
+  //Blynk.begin(blynkToken, ssid, pass);
+
+
+  WiFi.onEvent(WiFiStationConnected, SYSTEM_EVENT_STA_GOT_IP);
+  WiFi.onEvent(WiFiStationDisconnected, SYSTEM_EVENT_STA_DISCONNECTED);
+  WiFi.begin(ssid, pass);
+
+  Blynk.config(blynkToken);
+
+  if (Blynk.connect())
+  {
+    Serial.printf("[%8lu] setup: Blynk connected\r\n", millis());
+  }
+  else
+  {
+    Serial.printf("[%8lu] setup: Blynk no connected\r\n", millis());
+  }
+  Serial.printf("[%8lu] Setup: Start timer reconnected\r\n", millis());
+  numTimerReconnect = timer.setInterval(60000, ReconnectBlynk);
+
   // Clear the terminal content
   terminal.clear();
 
@@ -141,6 +162,13 @@ void setup()
   timer.setInterval(600000L, refreshAllTemperatures); //10minutes
   timer.setInterval(3600000L, everyHourTimer);
   timer.setInterval(60000L, everyMinuteTimer);
+}
+
+BLYNK_CONNECTED()
+{
+  Blynk.syncAll();
+  Blynk.virtualWrite(VP_ALARM_DETAILS, "Connected");
+  Serial.println("BLYNK_CONNECTED");
 }
 
 BLYNK_WRITE(VP_MODE)
@@ -425,12 +453,6 @@ void displayCurrentRoomInfo()
   Blynk.virtualWrite(VP_ROOM_TMP, t_in_room[currentRoom - 1]);
 }
 
-BLYNK_CONNECTED()
-{
-  Blynk.virtualWrite(VP_ALARM_DETAILS, "Connected");
-  Serial.println("BLYNK_CONNECTED");
-}
-
 BLYNK_READ(VP_TMP_BTN_REFRESH)
 {
   Blynk.virtualWrite(V4, millis() / 1000);
@@ -648,9 +670,66 @@ void getWeatherData() //client function to send/receive GET request data.
 
 }
 
+void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+  isWiFiConnected = true;
+  Serial.printf("[%8lu] Interrupt: Connected to AP, IP: ", millis());
+  Serial.println(WiFi.localIP());
+}
+
+void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+  isWiFiConnected = false;
+  Serial.printf("[%8lu] Interrupt: Disconnected to AP!\r\n", millis());
+}
+
+void ReconnectBlynk(void)
+{
+  if (!Blynk.connected())
+  {
+    if (Blynk.connect())
+    {
+      Serial.printf("[%8lu] ReconnectBlynk: Blynk reconnected\r\n", millis());
+    }
+    else
+    {
+      Serial.printf("[%8lu] ReconnectBlynk: Blynk not reconnected\r\n", millis());
+    }
+  }
+  else
+  {
+    Serial.printf("[%8lu] ReconnectBlynk: Blynk connected\r\n", millis());
+  }
+}
+
+void BlynkRun(void)
+{
+  if (isWiFiConnected)
+  {
+    if (Blynk.connected())
+    {
+      if (timer.isEnabled(numTimerReconnect))
+      {
+        timer.disable(numTimerReconnect);
+        Serial.printf("[%8lu] BlynkRun: Stop timer reconnected\r\n", millis());
+      }
+
+      Blynk.run();
+    }
+    else
+    {
+      if (!timer.isEnabled(numTimerReconnect))
+      {
+        timer.enable(numTimerReconnect);
+        Serial.printf("[%8lu] BlynkRun: Start timer reconnected\r\n", millis());
+      }
+    }
+  }
+}
+
 void loop()
 {
-  Blynk.run();
+  BlynkRun();
   timer.run();
 }
 
