@@ -66,9 +66,9 @@ byte sets_temp[5] = {2, 15, 20, 23, 25};
 enum homeMode_enum {NO_MODE, WAIT_MODE, HOME_MODE, NIGHT_MODE, GUESTS_MODE, STOP_MODE};
 byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] sets_temp[i]; 0-выключить, 100-не менять
   {1, 0, 1, 0, 0, 0, 0},        //ушел
-  {1, 2, 2, 3, 1, 1, 1},        //дома
-  {2, 2, 4, 4, 100, 100, 100},  //ночь
-  {1, 2, 2, 3, 4, 4, 4},        //гости
+  {2, 3, 4, 3, 1, 1, 1},        //дома
+  {1, 2, 1, 2, 100, 100, 100},  //ночь
+  {2, 2, 3, 3, 4, 4, 4},        //гости
   {1, 0, 0, 0, 0, 0, 0},        //стоп
 };
 homeMode_enum homeMode;
@@ -152,7 +152,7 @@ void setup()
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
   everyHourTimer();
-  everyMinuteTimer();
+  everyMinTimer();
 
   getWeatherData();
 
@@ -160,8 +160,8 @@ void setup()
   Blynk.notify("Device started ");
 
   timer.setInterval(600000L, refreshAllTemperatures); //10minutes
-  timer.setInterval(3600000L, everyHourTimer);
-  timer.setInterval(60000L, everyMinuteTimer);
+  timer.setInterval(3600000L, everyHourTimer); //sync time
+  timer.setInterval(60000L, everyMinTimer);    //incremet inner time
 }
 
 BLYNK_CONNECTED()
@@ -237,10 +237,10 @@ void refreshAllTemperatures() {
   refreshTemperature(true);
 }
 
-void everyMinuteTimer() {
+void everyMinTimer() {
   if (!freshTime)
   {
-    Serial.println("             everyMinuteTimer");
+    Serial.println("             everyMinTimer");
     tMinute += 1;
     if (tMinute == 60)
     {
@@ -350,6 +350,7 @@ BLYNK_WRITE(VP_SHOW_SETTINGS_BTN)
   if (param.asInt())
   {
     terminal.println("Next settings");
+    getWeatherData();
     terminal.flush();
   }
 }
@@ -370,7 +371,10 @@ BLYNK_WRITE(VP_AUTO_NIGHT_BTN)
 BLYNK_WRITE(VP_AUTO_NIGHT_START)
 {
   timeStartNightSec = param[0].asLong();
+  allowAuthoNight = true;
+  Blynk.virtualWrite(VP_AUTO_NIGHT_BTN, 1);
   Serial.println(timeStartNightSec);
+
   // terminal.println(sec);
   //terminal.flush();
 }
@@ -378,6 +382,8 @@ BLYNK_WRITE(VP_AUTO_NIGHT_START)
 BLYNK_WRITE(VP_AUTO_NIGHT_STOP)
 {
   timeStopNightSec = param[0].asLong();
+  allowAuthoNight = true;
+  Blynk.virtualWrite(VP_AUTO_NIGHT_BTN, 1);
   Serial.println(timeStopNightSec);
   //terminal.println(sec);
   //terminal.flush();
