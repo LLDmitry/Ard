@@ -36,7 +36,7 @@
 #define VP_DEVICE2_TIMER    V34
 #define VP_DEVICE3_TIMER    V35
 
-#define VP_SETTINGS_TXT     V50
+#define VP_PASSWORD_TXT     V50
 #define VP_TERMINAL         V51
 #define VP_SHOW_SETTINGS_BTN    V56
 #define VP_AUTO_NIGHT_BTN   V57
@@ -88,6 +88,8 @@ int numTimerReconnect = 0;
 
 volatile float t_in;
 volatile float t_out;
+
+bool allowChangeSettings;
 
 volatile float t_in_room[ROOMS_NUMBER];
 volatile byte heat_status_room[ROOMS_NUMBER]; //0-off, 1-on, 2-on in progress; 3-err
@@ -367,36 +369,66 @@ BLYNK_WRITE(VP_ALARM_BTN)
 
 BLYNK_WRITE(VP_AUTO_NIGHT_BTN)
 {
-  allowAuthoNight = param.asInt();
-  if (allowAuthoNight)
-    terminal.println("VP_AUTO_NIGHT_BTN On");
-  else
-    terminal.println("VP_AUTO_NIGHT_BTN Off");
-  terminal.flush();
+  if (allowChangeSettings)
+  {
+    Serial.println("ALLOW");
+    allowAuthoNight = param.asInt();
+    if (allowAuthoNight)
+      terminal.println("VP_AUTO_NIGHT_BTN On");
+    else
+      terminal.println("VP_AUTO_NIGHT_BTN Off");
+    terminal.flush();
 
-  Blynk.setProperty(VP_AUTO_NIGHT_START, "color", allowAuthoNight ? "#6b8e23" : "#877994");
-  Blynk.setProperty(VP_AUTO_NIGHT_STOP, "color", allowAuthoNight ? "#6b8e23" : "#877994");
+    Blynk.setProperty(VP_AUTO_NIGHT_START, "color", allowAuthoNight ? "#6b8e23" : "#877994");
+    Blynk.setProperty(VP_AUTO_NIGHT_STOP, "color", allowAuthoNight ? "#6b8e23" : "#877994");
+  }
+  else
+  {
+    //reset changes
+    Serial.println("NOT ALLOW");
+    Blynk.virtualWrite(VP_AUTO_NIGHT_BTN, allowAuthoNight);
+  }
 }
 
 BLYNK_WRITE(VP_AUTO_NIGHT_START)
 {
-  timeStartNightSec = param[0].asLong();
-  allowAuthoNight = true;
-  Blynk.virtualWrite(VP_AUTO_NIGHT_BTN, 1);
-  Serial.println(timeStartNightSec);
-
-  // terminal.println(sec);
-  //terminal.flush();
+  if (allowChangeSettings)
+  {
+    Serial.println("ALLOW");
+    timeStartNightSec = param[0].asLong();
+    allowAuthoNight = true;
+    Blynk.virtualWrite(VP_AUTO_NIGHT_BTN, 1);
+    Serial.println(timeStartNightSec);
+  }
+  else
+  {
+    //reset changes
+    Serial.println("NOT ALLOW");
+    char tz[] = "Europe/Moscow";
+    char days[] = "1";
+    Blynk.virtualWrite(VP_AUTO_NIGHT_START, timeStartNightSec, 0, tz, days);
+  }
 }
 
 BLYNK_WRITE(VP_AUTO_NIGHT_STOP)
 {
-  timeStopNightSec = param[0].asLong();
-  allowAuthoNight = true;
-  Blynk.virtualWrite(VP_AUTO_NIGHT_BTN, 1);
-  Serial.println(timeStopNightSec);
-  //terminal.println(sec);
-  //terminal.flush();
+  if (allowChangeSettings)
+  {
+    Serial.println("ALLOW");
+    timeStopNightSec = param[0].asLong();
+    allowAuthoNight = true;
+    Blynk.virtualWrite(
+      VP_AUTO_NIGHT_BTN, 1);
+    Serial.println(timeStopNightSec);
+  }
+  else
+  {
+    //reset changes
+    Serial.println("NOT ALLOW");
+    char tz[] = "Europe/Moscow";
+    char days[] = "1";
+    Blynk.virtualWrite(VP_AUTO_NIGHT_STOP, timeStopNightSec, 0, tz, days);
+  }
 }
 
 void setRoomHeatStatus(bool allRooms)
@@ -488,9 +520,17 @@ void displayCurrentRoomInfo()
   Blynk.virtualWrite(VP_ROOM_TMP, t_in_room[currentRoom - 1]);
 }
 
-BLYNK_READ(VP_TMP_BTN_REFRESH)
+BLYNK_WRITE(VP_PASSWORD_TXT)
 {
-  Blynk.virtualWrite(V4, millis() / 1000);
+  if (param.asInt() == 123)
+  {
+    Serial.println("        PASSWORD CORRECT!!!");
+    Blynk.virtualWrite(VP_PASSWORD_TXT, "***");
+    allowChangeSettings = true;
+    timer.setTimeout(30000L, stopAllowChangeSettingsTimer);    //stop ability to change admin settings
+  }
+  else
+    Serial.println("        PASSWORD NOT CORRECT");
 }
 
 void refreshLocalTime()
@@ -760,6 +800,12 @@ void BlynkRun(void)
       }
     }
   }
+}
+
+void stopAllowChangeSettingsTimer()
+{
+  Blynk.virtualWrite(VP_PASSWORD_TXT, "###");
+  allowChangeSettings = false;
 }
 
 void loop()
