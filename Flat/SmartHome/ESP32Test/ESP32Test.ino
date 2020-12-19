@@ -18,6 +18,7 @@
 #define VP_TMP_OUT          V6
 #define VP_TMP_IN           V7
 #define VP_TMP_BTN_REFRESH  V8
+#define VP_POWER_HEATER_LEVEL      V9
 
 #define VP_ROOM_SELECT      V20
 #define VP_ROOM_TMP         V21
@@ -42,6 +43,8 @@
 #define VP_AUTO_NIGHT_START V58
 #define VP_AUTO_NIGHT_STOP  V59
 
+#define interruptPin  25
+
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
 // Go to the Project Settings (nut icon).
@@ -62,6 +65,7 @@ String cityID = "482443"; //Токсово
 
 const byte ROOMS_NUMBER = 7;
 
+int powerHeaters[ROOMS_NUMBER] = {800, 2000, 2000, 500, 800, 1000, 1000};
 byte sets_temp[5] = {2, 15, 20, 23, 25};
 enum homeMode_enum {NO_MODE, WAIT_MODE, HOME_MODE, NIGHT_MODE, GUESTS_MODE, STOP_MODE};
 byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] sets_temp[i]; 0-выключить, 100-не менять
@@ -117,6 +121,11 @@ String windDegString;
 String cloudsString;
 String firstString;
 
+void IRAM_ATTR detectsMovement() {
+  Serial.print("          ALARM! ");
+  Blynk.virtualWrite(VP_ALARM_STATUS, 1);
+}
+
 void setup()
 {
   // Debug console
@@ -140,6 +149,9 @@ void setup()
   }
   Serial.printf("[%8lu] Setup: Start timer reconnected\r\n", millis());
   numTimerReconnect = timer.setInterval(60000, ReconnectBlynk);
+
+  pinMode(interruptPin, INPUT);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), detectsMovement, RISING);
 
   // Clear the terminal content
   terminal.clear();
@@ -210,12 +222,6 @@ void changeHomeMode(homeMode_enum newHomeMode, bool authoChange)
 void displayCurrentRoomTemperatureSet()
 {
   Blynk.virtualWrite(VP_ROOM_TMP_SET, set_temp_room[currentRoom - 1]);
-  //  for (int i = 0; i <= 5; i++) {
-  //    if (set_temp_room[currentRoom] <= sets_temp[i])
-  //    {
-  //      Blynk.virtualWrite(VP_ROOM_TMP_SET, i);
-  //      break;
-  //    }
 }
 
 void displayCurrentRoomHeatBtn()
@@ -283,20 +289,18 @@ void everyHourTimer() {
   freshTime = true;
 }
 
-
 void refreshTemperature(bool allRooms) {
   Serial.println("refreshTemperatures");
-  t_out = random(-20, 35);
-  t_in = random(-5, 35);
-  Blynk.virtualWrite(VP_TMP_OUT, t_out);
-  Blynk.virtualWrite(VP_TMP_IN, t_in);
-  Blynk.virtualWrite(VP_TMP_BTN_REFRESH, LOW);
 
   if (allRooms)
   {
     for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
       t_in_room[i] = random(-5, 35);
     }
+    t_out = random(-20, 35);
+    Blynk.virtualWrite(VP_TMP_IN, t_in_room[0]);
+    Blynk.virtualWrite(VP_TMP_OUT, t_out);
+    Blynk.virtualWrite(VP_TMP_BTN_REFRESH, LOW);
   }
   else
   {
@@ -310,6 +314,7 @@ void refreshTemperature(bool allRooms) {
 BLYNK_WRITE(VP_ROOM_SELECT)
 {
   currentRoom = param.asInt();
+  displayCurrentRoomInfo();
   displayCurrentRoomTemperatureSet();
   displayCurrentRoomHeatBtn();
   Serial.println("Room=" + currentRoom);
@@ -353,6 +358,11 @@ BLYNK_WRITE(VP_SHOW_SETTINGS_BTN)
     getWeatherData();
     terminal.flush();
   }
+}
+
+BLYNK_WRITE(VP_ALARM_BTN)
+{
+  Blynk.virtualWrite(VP_ALARM_STATUS, 0);
 }
 
 BLYNK_WRITE(VP_AUTO_NIGHT_BTN)
@@ -411,19 +421,38 @@ void setRoomHeatStatus(bool allRooms)
     }
   }
   displayCurrentRoomInfo();
+  displayPowerHeatersLevel();
 }
 
 bool checkHeatSwitch(byte room)
 {
-  if (room == 1)
-  {
-    Serial.println("checkHeatSwitch");
-    Serial.print("t_in_room ");
-    Serial.println(t_in_room[room - 1]);
-    Serial.print("set_temp_room ");
-    Serial.println(set_temp_room[room - 1]);
-  }
+  //  if (room == 1)
+  //  {
+  //    Serial.println("checkHeatSwitch");
+  //    Serial.print("t_in_room ");
+  //    Serial.println(t_in_room[room - 1]);
+  //    Serial.print("set_temp_room ");
+  //    Serial.println(set_temp_room[room - 1]);
+  //  }
   return (heat_status_room[room - 1] == 1 && t_in_room[room - 1] < sets_temp[set_temp_room[room - 1] - 1]); //включить нагрев
+}
+
+void displayPowerHeatersLevel()
+{
+  Serial.println("                          displayPowerHeatersLevel");
+  //calc maxPowerHeater;
+  float totalPowerHeaters = 0;
+  float maxPowerHeater = 0.0;
+  for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
+    maxPowerHeater += powerHeaters[i];
+    if (heat_status_room[i] == 2)
+      totalPowerHeaters += powerHeaters[i];
+  }
+  byte calcTo100TotalPowerHeaters = (float)(100 * (totalPowerHeaters / maxPowerHeater));
+  Serial.println(totalPowerHeaters);
+  Serial.println(maxPowerHeater);
+  Serial.println(calcTo100TotalPowerHeaters);
+  Blynk.virtualWrite(VP_POWER_HEATER_LEVEL, calcTo100TotalPowerHeaters);
 }
 
 BLYNK_WRITE(VP_ROOM_TMP_SET)
