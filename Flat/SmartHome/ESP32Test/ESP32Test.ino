@@ -66,9 +66,17 @@ String cityID = "482443"; //Токсово
 const byte ROOMS_NUMBER = 7;
 
 int powerHeaters[ROOMS_NUMBER] = {800, 2000, 2000, 500, 800, 1000, 1000};
-byte sets_temp[5] = {2, 15, 20, 23, 25};
+byte sets_temp[ROOMS_NUMBER][5] = {
+  {2, 15, 20, 23, 25},
+  {2, 15, 20, 23, 25},
+  {2, 15, 20, 23, 25},
+  {2, 15, 19, 21, 23},
+  {2, 15, 20, 23, 25},
+  {2, 12, 20, 23, 25},
+  {2, 10, 15, 18, 21},
+};
 enum homeMode_enum {NO_MODE, WAIT_MODE, HOME_MODE, NIGHT_MODE, GUESTS_MODE, STOP_MODE};
-byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] sets_temp[i]; 0-выключить, 100-не менять
+byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] sets_temp[room][i]; 0-выключить, 100-не менять
   {1, 0, 1, 0, 0, 0, 0},        //ушел
   {2, 3, 4, 3, 1, 1, 1},        //дома
   {1, 2, 1, 2, 100, 100, 100},  //ночь
@@ -211,7 +219,7 @@ void changeHomeMode(homeMode_enum newHomeMode, bool authoChange)
       else
         heat_control_room[i] = 1;
       setRoomHeatStatus(true);
-      displayCurrentRoomTemperatureSet();
+      displayCurrentRoomHeaterTemperature();
       displayCurrentRoomHeatBtn();
     }
   }
@@ -221,7 +229,7 @@ void changeHomeMode(homeMode_enum newHomeMode, bool authoChange)
   }
 }
 
-void displayCurrentRoomTemperatureSet()
+void displayCurrentRoomHeaterTemperature()
 {
   Blynk.virtualWrite(VP_ROOM_TMP_SET, set_temp_room[currentRoom - 1]);
 }
@@ -315,11 +323,32 @@ void refreshTemperature(bool allRooms) {
 
 BLYNK_WRITE(VP_ROOM_SELECT)
 {
+  byte prevCurrentRoom = currentRoom;
   currentRoom = param.asInt();
   displayCurrentRoomInfo();
-  displayCurrentRoomTemperatureSet();
+  displayCurrentRoomTemperatuteSet(prevCurrentRoom);
+  displayCurrentRoomHeaterTemperature();
   displayCurrentRoomHeatBtn();
   Serial.println("Room=" + currentRoom);
+}
+
+void displayCurrentRoomTemperatuteSet(byte prevCurrentRoom)
+{
+  if (sets_temp[prevCurrentRoom - 1][0] != sets_temp[currentRoom - 1][0] ||
+      sets_temp[prevCurrentRoom - 1][1] != sets_temp[currentRoom - 1][1] ||
+      sets_temp[prevCurrentRoom - 1][2] != sets_temp[currentRoom - 1][2] ||
+      sets_temp[prevCurrentRoom - 1][3] != sets_temp[currentRoom - 1][3] ||
+      sets_temp[prevCurrentRoom - 1][4] != sets_temp[currentRoom - 1][4]
+     )
+  {
+    Blynk.setProperty(VP_ROOM_TMP_SET, "labels",
+                      sets_temp[currentRoom - 1][0],
+                      sets_temp[currentRoom - 1][1],
+                      sets_temp[currentRoom - 1][2],
+                      sets_temp[currentRoom - 1][3],
+                      sets_temp[currentRoom - 1][4]
+                     );
+  }
 }
 
 BLYNK_WRITE(VP_ROOM_HEAT_BTN)
@@ -466,7 +495,7 @@ bool checkHeatSwitch(byte room)
   //    Serial.print("set_temp_room ");
   //    Serial.println(set_temp_room[room - 1]);
   //  }
-  return (heat_status_room[room - 1] == 1 && t_in_room[room - 1] < sets_temp[set_temp_room[room - 1] - 1]); //включить нагрев
+  return (heat_status_room[room - 1] == 1 && t_in_room[room - 1] < sets_temp[room - 1][set_temp_room[room - 1] - 1]); //включить нагрев
 }
 
 void displayPowerHeatersLevel()
