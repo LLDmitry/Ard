@@ -98,6 +98,7 @@ volatile float t_in;
 volatile float t_out;
 
 bool allowChangeSettings;
+bool motionDetected;
 
 volatile float t_in_room[ROOMS_NUMBER];
 volatile byte heat_status_room[ROOMS_NUMBER]; //0-off, 1-on, 2-on in progress; 3-err
@@ -131,9 +132,8 @@ String windDegString;
 String cloudsString;
 String firstString;
 
-void IRAM_ATTR detectsMovement() {
-  Serial.print("          ALARM! ");
-  Blynk.virtualWrite(VP_ALARM_STATUS, 1);
+void IRAM_ATTR detectsMotion() {
+  motionDetected = true;
 }
 
 void setup()
@@ -161,7 +161,7 @@ void setup()
   numTimerReconnect = timer.setInterval(60000, ReconnectBlynk);
 
   pinMode(interruptPin, INPUT);
-  attachInterrupt(digitalPinToInterrupt(interruptPin), detectsMovement, RISING);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), detectsMotion, RISING);
 
   // Clear the terminal content
   terminal.clear();
@@ -184,6 +184,7 @@ void setup()
   timer.setInterval(600000L, refreshAllTemperatures); //10minutes
   timer.setInterval(3600000L, everyHourTimer); //sync time
   timer.setInterval(60000L, everyMinTimer);    //incremet inner time
+  timer.setInterval(10000L, every10SecTimer);    //checkAlarm
 }
 
 BLYNK_CONNECTED()
@@ -253,6 +254,17 @@ void refreshAllTemperatures() {
   refreshTemperature(true);
 }
 
+void every10SecTimer() {
+  if (motionDetected)
+  {
+    // Blynk.virtualWrite(VP_ALARM_STATUS, HIGH);
+    String lbl = "Тревога " + (String)tHour + ":" + (tMinute < 10 ? "0" : "") + (String)tMinute;
+    Blynk.setProperty(VP_ALARM_BTN, "onLabel", lbl);
+    Blynk.notify(lbl);
+    Blynk.virtualWrite(VP_ALARM_BTN, HIGH);
+    motionDetected = false;
+  }
+}
 void everyMinTimer() {
   if (!freshTime)
   {
