@@ -6,6 +6,9 @@
 #include "time.h"
 #include <ArduinoJson.h>
 
+#include <Preferences.h>
+//#include <EEPROM.h>
+
 /* Set this to a bigger number, to enable sending longer messages */
 //#define BLYNK_MAX_SENDBYTES 128
 
@@ -64,6 +67,7 @@ String weatherLang = "&lang=ru";
 String cityID = "482443"; //Токсово
 
 const byte ROOMS_NUMBER = 7;
+const byte EEPROM_SIZE = 1;
 
 int powerHeaters[ROOMS_NUMBER] = {800, 2000, 2000, 500, 800, 1000, 1000};
 byte sets_temp[ROOMS_NUMBER][5] = {
@@ -80,7 +84,7 @@ byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3
   {1, 0, 1, 0, 0, 0, 0},        //ушел
   {2, 3, 4, 3, 1, 1, 1},        //дома
   {1, 2, 1, 2, 100, 100, 100},  //ночь
-  {2, 2, 3, 3, 4, 4, 4},        //гости
+  {1, 0, 3, 3, 4, 4, 4},        //гости
   {1, 0, 0, 0, 0, 0, 0},        //стоп
 };
 homeMode_enum homeMode;
@@ -89,6 +93,11 @@ homeMode_enum homeModeBeforeNight;
 unsigned count = 0;
 BlynkTimer timer;
 WidgetTerminal terminal(VP_TERMINAL);
+
+//Preferences prefs;
+Preferences prefs;
+//EEPROM.begin(EEPROM_SIZE);
+
 struct tm timeinfo;
 
 bool isWiFiConnected = false;
@@ -135,6 +144,40 @@ String firstString;
 void IRAM_ATTR detectsMotion() {
   motionDetected = true;
 }
+
+void backupDefaultTemp()
+{
+
+  Serial.println("backupDefaultTemp");
+  for (int s = 0; s < 5; s++) {
+    for (int r = 0; r < ROOMS_NUMBER; r++) {
+      char a[3];
+      ((String)s + (String)r).toCharArray(a, 3);
+      Serial.print(a);
+      Serial.print(": ");
+      Serial.println(defaultTemp[s][r]);
+      prefs.putUInt(a, defaultTemp[s][r]);
+    }
+  }
+  //prefs.end();
+}
+
+void restoreDefaultTemp()
+{
+  Serial.println("restoreDefaultTemp");
+  for (int s = 0; s < 5; s++) {
+    for (int r = 0; r < ROOMS_NUMBER; r++) {
+      char a[3];
+      ((String)s + (String)r).toCharArray(a, 3);
+      Serial.print(a);
+      Serial.print(": ");
+      defaultTemp[s][r] = prefs.getUInt(a, 0);
+      Serial.println(defaultTemp[s][r]);
+    }
+  }
+  //prefs.end();
+}
+
 
 void setup()
 {
@@ -185,6 +228,11 @@ void setup()
   timer.setInterval(3600000L, everyHourTimer); //sync time
   timer.setInterval(60000L, everyMinTimer);    //incremet inner time
   timer.setInterval(10000L, every10SecTimer);    //checkAlarm
+
+  //eeprom analog
+  prefs.begin("nvs", false);
+  //backupDefaultTemp(); //1st time, comment after
+  restoreDefaultTemp();
 }
 
 BLYNK_CONNECTED()
@@ -635,7 +683,6 @@ void execTerminalCommands(String command)
   homeMode_enum keyCommand;
 
   command.toCharArray(char_array, str_len);
-  //char sz[] = "wills,this,works,40,43";
   char *p = char_array;
   int i = 0;
   while ((str = strtok_r(p, " ", &p)) != NULL)
@@ -660,7 +707,10 @@ void execTerminalCommands(String command)
       else
       {
         defaultTemp[keyCommand][getRoom(str)] = getValue(str);
-        //VP_ROOM_TEMP_SET2
+        //EEPROM.write(getRoom(str), getValue(str));
+        char a[3];
+        ((String)keyCommand + (String)getRoom(str)).toCharArray(a, 3);
+        prefs.putUChar(a, getValue(str));
       }
     }
   }
