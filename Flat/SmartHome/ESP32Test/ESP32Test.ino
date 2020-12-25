@@ -79,7 +79,7 @@ byte sets_temp[ROOMS_NUMBER][5] = {
   {2, 12, 20, 23, 25},
   {2, 10, 15, 18, 21},
 };
-enum homeMode_enum {NO_MODE, WAIT_MODE, HOME_MODE, NIGHT_MODE, GUESTS_MODE, STOP_MODE};
+enum homeMode_enum {WAIT_MODE, HOME_MODE, NIGHT_MODE, GUESTS_MODE, STOP_MODE};
 byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] sets_temp[room][i]; 0-выключить, 100-не менять
   {1, 0, 1, 0, 0, 0, 0},        //ушел
   {2, 3, 4, 3, 1, 1, 1},        //дома
@@ -94,7 +94,6 @@ unsigned count = 0;
 BlynkTimer timer;
 WidgetTerminal terminal(VP_TERMINAL);
 
-//Preferences prefs;
 Preferences prefs;
 //EEPROM.begin(EEPROM_SIZE);
 
@@ -178,6 +177,23 @@ void restoreDefaultTemp()
   //prefs.end();
 }
 
+void backupSettings()
+{
+  Serial.println("backupSettingds");
+  prefs.putUInt("nal", allowAuthoNight);
+  prefs.putUInt("nst", timeStartNightSec);
+  prefs.putUInt("nsp", timeStopNightSec);
+}
+
+void restoreSettings()
+{
+  Serial.println("restoreSettings");
+  allowAuthoNight = prefs.getUInt("nal", 0);
+  timeStartNightSec = prefs.getUInt("nst", 0);
+  timeStopNightSec = prefs.getUInt("nsp", 0);
+  Serial.print("  timeStartNightSec ");
+  Serial.println(timeStartNightSec);
+}
 
 void setup()
 {
@@ -233,6 +249,7 @@ void setup()
   prefs.begin("nvs", false);
   //backupDefaultTemp(); //1st time, comment after
   restoreDefaultTemp();
+  restoreSettings();
 }
 
 BLYNK_CONNECTED()
@@ -244,7 +261,7 @@ BLYNK_CONNECTED()
 
 BLYNK_WRITE(VP_MODE)
 {
-  changeHomeMode((homeMode_enum)param.asInt(), false);
+  changeHomeMode((homeMode_enum)(param.asInt() - 1), false);
 }
 
 void changeHomeMode(homeMode_enum newHomeMode, bool authoChange)
@@ -253,53 +270,55 @@ void changeHomeMode(homeMode_enum newHomeMode, bool authoChange)
   homeMode = newHomeMode;
   Serial.println(homeMode);
   for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
-    if (defaultTemp[homeMode - 1][i] != 100 && set_temp_room[i] != defaultTemp[homeMode - 1][i])
+    if (defaultTemp[homeMode][i] != 100 && set_temp_room[i] != defaultTemp[homeMode][i])
     {
-      set_temp_room[i] = defaultTemp[homeMode - 1][i];
+      set_temp_room[i] = defaultTemp[homeMode][i];
       Serial.print("room ");
       Serial.println(i);
       Serial.print("set_temp_room=");
       Serial.println(set_temp_room[i]);
-      if (set_temp_room[i] == 0) //0 -switch off eater
+      if (set_temp_room[i] == 0) //0 -switch off heater
       {
         Serial.println("stop heat");
         heat_control_room[i] = 0;
       }
       else
         heat_control_room[i] = 1;
-      setRoomHeatStatus(true);
-      displayCurrentRoomHeaterTemperature();
-      displayCurrentRoomHeatBtn();
     }
   }
+
+  setRoomHeatStatus(true, true);
   if (authoChange)
   {
-    Blynk.virtualWrite(VP_MODE, homeMode);
+    Blynk.virtualWrite(VP_MODE, homeMode + 1);
   }
+  displayCurrentRoomHeaterTemperature();
+  displayCurrentRoomHeatBtn();
 }
 
 void displayCurrentRoomHeaterTemperature()
 {
+  Serial.println("displayCurrentRoomHeaterTemperature");
   Blynk.virtualWrite(VP_ROOM_TMP_SET, set_temp_room[currentRoom - 1]);
 }
 
 void displayCurrentRoomHeatBtn()
 {
+  Serial.println("displayCurrentRoomHeatBtn");
   Blynk.virtualWrite(VP_ROOM_HEAT_BTN, heat_control_room[currentRoom - 1]);
 }
-
 
 BLYNK_WRITE(VP_TMP_BTN_REFRESH)
 {
   int btnVal = param.asInt();
   if (btnVal == HIGH)
   {
-    refreshTemperature(true);
+    refreshTemperature(true, true);
   }
 }
 
 void refreshAllTemperatures() {
-  refreshTemperature(true);
+  refreshTemperature(true, false);
 }
 
 void every10SecTimer() {
@@ -313,6 +332,7 @@ void every10SecTimer() {
     motionDetected = false;
   }
 }
+
 void everyMinTimer() {
   if (!freshTime)
   {
@@ -339,6 +359,11 @@ void checkTimer() {
   Serial.println("checkTimer");
   long nowSec = 3600 * tHour + 60 * tMinute;
   Serial.println(nowSec);
+  Serial.println(allowAuthoNight);
+  Serial.println(homeMode);
+  Serial.println(HOME_MODE);
+  Serial.println(nowSec);
+  Serial.println(timeStartNightSec);
   if (allowAuthoNight && (homeMode == HOME_MODE || homeMode == GUESTS_MODE) && nowSec == timeStartNightSec)
   {
     Serial.println("START NIGHT");
@@ -354,12 +379,31 @@ void checkTimer() {
 }
 
 void everyHourTimer() {
-  Serial.println("             everyHourTimer");
+  Serial.println("everyHourTimer");
   refreshLocalTime();
   freshTime = true;
 }
 
-void refreshTemperature(bool allRooms) {
+//from application, every 2 minutes
+BLYNK_READ(VP_TMP_OUT)
+{
+  Serial.println("                                                                              Blynk.virtualWrite(VP_TMP_OUT");
+  //refreshTemperature(true, true);
+  displayCurrentData();
+}
+
+void displayCurrentData()
+{
+  Serial.println("displayCurrentData");
+  Blynk.virtualWrite(VP_TMP_IN, t_in_room[0]);
+  Blynk.virtualWrite(VP_TMP_OUT, t_out);
+  Blynk.virtualWrite(VP_TMP_BTN_REFRESH, LOW);
+
+  displayCurrentRoomInfo();
+  displayPowerHeatersLevel();
+}
+
+void refreshTemperature(bool allRooms, bool displayData) {
   Serial.println("refreshTemperatures");
 
   if (allRooms)
@@ -368,21 +412,22 @@ void refreshTemperature(bool allRooms) {
       t_in_room[i] = random(-5, 35);
     }
     t_out = random(-20, 35);
-    Blynk.virtualWrite(VP_TMP_IN, t_in_room[0]);
-    Blynk.virtualWrite(VP_TMP_OUT, t_out);
-    Blynk.virtualWrite(VP_TMP_BTN_REFRESH, LOW);
   }
   else
   {
     t_in_room[currentRoom - 1] = random(-5, 35);
   }
 
-  setRoomHeatStatus(allRooms);
-  displayCurrentRoomInfo();
+  setRoomHeatStatus(allRooms, false);
+  if (displayData)
+  {
+    displayCurrentData();
+  }
 }
 
 BLYNK_WRITE(VP_ROOM_SELECT)
 {
+  Serial.println("VP_ROOM_SELECT");
   byte prevCurrentRoom = currentRoom;
   currentRoom = param.asInt();
   displayCurrentRoomInfo();
@@ -413,6 +458,7 @@ void displayCurrentRoomTemperatuteSet(byte prevCurrentRoom)
 
 BLYNK_WRITE(VP_ROOM_HEAT_BTN)
 {
+  Serial.println("VP_ROOM_HEAT_BTN");
   if (param.asInt() == 1 && set_temp_room[currentRoom - 1] == 0) //try to push but T was not selected before -> unpush
   {
     Blynk.virtualWrite(VP_ROOM_HEAT_BTN, LOW);
@@ -420,11 +466,7 @@ BLYNK_WRITE(VP_ROOM_HEAT_BTN)
   }
 
   heat_control_room[currentRoom - 1] = param.asInt();
-  //  Serial.print("currentRoom=");
-  //  Serial.println(currentRoom);
-  //  Serial.println("heat_control_room = ");
-  //  Serial.println(heat_control_room[currentRoom - 1]);
-  setRoomHeatStatus(false);
+  setRoomHeatStatus(false, true);
 }
 
 BLYNK_WRITE(VP_TERMINAL)
@@ -462,6 +504,7 @@ BLYNK_WRITE(VP_AUTO_NIGHT_BTN)
   {
     Serial.println("ALLOW");
     allowAuthoNight = param.asInt();
+    backupSettings();
     if (allowAuthoNight)
       terminal.println("VP_AUTO_NIGHT_BTN On");
     else
@@ -488,6 +531,7 @@ BLYNK_WRITE(VP_AUTO_NIGHT_START)
     allowAuthoNight = true;
     Blynk.virtualWrite(VP_AUTO_NIGHT_BTN, 1);
     Serial.println(timeStartNightSec);
+    backupSettings();
   }
   else
   {
@@ -509,6 +553,7 @@ BLYNK_WRITE(VP_AUTO_NIGHT_STOP)
     Blynk.virtualWrite(
       VP_AUTO_NIGHT_BTN, 1);
     Serial.println(timeStopNightSec);
+    backupSettings();
   }
   else
   {
@@ -520,11 +565,12 @@ BLYNK_WRITE(VP_AUTO_NIGHT_STOP)
   }
 }
 
-void setRoomHeatStatus(bool allRooms)
+void setRoomHeatStatus(bool allRooms, bool dispalyData)
 {
   Serial.println("setRoomHeatStatus");
   if (allRooms)
   {
+    Serial.println("allRooms");
     for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
       heat_status_room[i] = heat_control_room[i];
       if (checkHeatSwitch(i + 1))
@@ -541,8 +587,11 @@ void setRoomHeatStatus(bool allRooms)
       heat_status_room[currentRoom - 1] = 2;
     }
   }
-  displayCurrentRoomInfo();
-  displayPowerHeatersLevel();
+  if (dispalyData)
+  {
+    displayCurrentRoomInfo();
+    displayPowerHeatersLevel();
+  }
 }
 
 bool checkHeatSwitch(byte room)
@@ -560,7 +609,7 @@ bool checkHeatSwitch(byte room)
 
 void displayPowerHeatersLevel()
 {
-  Serial.println("                          displayPowerHeatersLevel");
+  Serial.println("displayPowerHeatersLevel");
   //calc maxPowerHeater;
   float totalPowerHeaters = 0;
   float maxPowerHeater = 0.0;
@@ -578,9 +627,10 @@ void displayPowerHeatersLevel()
 
 BLYNK_WRITE(VP_ROOM_TMP_SET)
 {
+  Serial.println("VP_ROOM_TMP_SET");
   set_temp_room[currentRoom - 1] = param.asInt();
   heat_control_room[currentRoom - 1] = 1;
-  setRoomHeatStatus(false);
+  setRoomHeatStatus(false, true);
   displayCurrentRoomHeatBtn();
 }
 
@@ -674,6 +724,9 @@ const String nightWord = "ночь";
 
 void execTerminalCommands(String command)
 {
+  Serial.print("defaultTemp prev");
+  Serial.println(defaultTemp[2][1]);
+
   int str_len = command.length() + 1;
   char char_array[str_len];
   char *str;
@@ -706,11 +759,24 @@ void execTerminalCommands(String command)
       }
       else
       {
+        Serial.print("keyCommand");
+        Serial.println(keyCommand);
+        Serial.print("getRoom(str)");
+        Serial.println(getRoom(str));
+        Serial.print("getValue(str)");
+        Serial.println(getValue(str));
+
         defaultTemp[keyCommand][getRoom(str)] = getValue(str);
+
         //EEPROM.write(getRoom(str), getValue(str));
         char a[3];
         ((String)keyCommand + (String)getRoom(str)).toCharArray(a, 3);
-        prefs.putUChar(a, getValue(str));
+        prefs.putUInt(a, defaultTemp[keyCommand][getRoom(str)]);
+        if (keyCommand == homeMode)
+        {
+          changeHomeMode(homeMode, false); //чтобы стразу применилось если текущий mode = настраиваемуму
+        }
+
       }
     }
   }
@@ -730,6 +796,8 @@ void execTerminalCommands(String command)
   {
 
   }
+  Serial.print("defaultTemp post");
+  Serial.println(defaultTemp[2][1]);
 }
 
 homeMode_enum getKeyCommand(String key)
@@ -743,7 +811,7 @@ homeMode_enum getKeyCommand(String key)
 
 byte getRoom(String key)
 {
-  return key.substring(2, 3).toInt();
+  return key.substring(2, 3).toInt() - 1;
 }
 
 byte getValue(String key)
