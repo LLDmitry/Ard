@@ -526,7 +526,7 @@ BLYNK_WRITE(VP_ALARM_BTN)
 
 BLYNK_WRITE(VP_AUTO_NIGHT_BTN)
 {
-  if (allowChangeSettings)
+  if (allowChangeSettings || isSetup)
   {
     Serial.println("ALLOW");
     allowAuthoNight = param.asInt();
@@ -550,7 +550,7 @@ BLYNK_WRITE(VP_AUTO_NIGHT_BTN)
 
 BLYNK_WRITE(VP_AUTO_NIGHT_START)
 {
-  if (allowChangeSettings)
+  if (allowChangeSettings || isSetup)
   {
     Serial.println("ALLOW");
     timeStartNightSec = param[0].asLong();
