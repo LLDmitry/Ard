@@ -1,0 +1,35 @@
+1
+C:\Program Files (x86)\Arduino\libraries\RF24-master\RF24_config.h
+>
+#ifdef ESP8266
+  #include <pgmspace.h>
+#else
+  #include <avr/pgmspace.h>
+#endif
+
+2
+C:\Program Files (x86)\Arduino\libraries\Adafruit_BMP085\Adafruit_BMP085.cpp:19:24: fatal error: util/delay.h: No such file or directory
+>просто закоментировал сточку #include <util/delay.h> и о чудо ошибка пропала
+
+#include "Adafruit_BMP085.h"
+> #include <util/delay.h>    удалить
+
+3
+In file included from C:\repos\Ard\Flat\SmartHome\ESP32Test\ESP32Test.ino:13:0:
+C:\Program Files (x86)\Arduino\libraries\OneWire/OneWire.h:77:2: error: #error "Please define I/O register types here"
+ #error "Please define I/O register types here"
+> Библиотеки OneWire и DallasTemperature необходимо устанавливать с помощью управления библиотеками: Скетч -> Подключить библиотеку -> Управлять библиотеками. Появится менеджер библиотек, похожий на менеджер плат. В поле поиска ввести OneWire, появится соответствующий бокс, там нажать Установить. Затем в поле поиска набрать DallasTemperature и установить эту библиотеку. Простое копирование скачанных папок с библиотеками в папку libraries не даёт нужного результата. Ошибка error: #error "Please define I/O register types here" появляется как раз из-за неправильно установленных библиотек. Источник: https://alcodistillers.ru/forum/viewtopic.php?id=661&p=7 AlcoDistillers.ru ©
+
+4
+In file included from C:\Program Files (x86)\Arduino\libraries\RF24-master\RF24.cpp:9:0:
+C:\Program Files (x86)\Arduino\libraries\RF24-master\x
+ #define STATUS      0x07
+
+>install RF24
+
+5
+C:\Program Files (x86)\Arduino\libraries\Adafruit_BMP085\Adafruit_BMP085.cpp: In member function 'uint16_t Adafruit_BMP085::readRawTemperature()':
+C:\Program Files (x86)\Arduino\libraries\Adafruit_BMP085\Adafruit_BMP085.cpp:66:14: error: '_delay_ms' was not declared in this scope
+   _delay_ms(5);
+
+> remove #include <Adafruit_BMP085.h>

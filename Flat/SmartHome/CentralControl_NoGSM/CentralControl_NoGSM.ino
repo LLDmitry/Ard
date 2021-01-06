@@ -1,3 +1,5 @@
+#include <SoftwareSerial.h>
+
 //Home_Central Control
 //Arduino Mini
 //Управление домом без GSM
@@ -12,7 +14,7 @@
 //
 
 #include <NrfCommands.h> // C:\Program Files (x86)\Arduino\libraries\NrfCommands
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
 #include <elapsedMillis.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -1808,7 +1810,7 @@ void RefreshSensorData()
 
     //    h[ROOM_GOST] = dht.readHumidity();
     //    t_inn[ROOM_GOST] = dht.readTemperature();
-    p_v = 0.075 * bmp.readPressure();
+    p_v = 0.0075 * bmp.readPressure();
 
     lastRefreshSensor_ms = 0;
   }

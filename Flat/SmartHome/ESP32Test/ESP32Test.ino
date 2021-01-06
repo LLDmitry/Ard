@@ -5,9 +5,19 @@
 #include <BlynkSimpleEsp32.h>
 #include "time.h"
 #include <ArduinoJson.h>
-
 #include <Preferences.h>
-//#include <EEPROM.h>
+
+#include <NrfCommands.h> // C:\Program Files (x86)\Arduino\libraries\NrfCommands
+//#include <SoftwareSerial.h>
+#include <elapsedMillis.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include "sav_button.h" // Библиотека работы с кнопками
+#include <RF24.h>
+#include <RF24_config.h>
+#include <Adafruit_BMP085.h> //давление Vcc – +5в; SDA – (A4);SCL - (A5)
+
+//#include <util/delay.h>
 
 /* Set this to a bigger number, to enable sending longer messages */
 //#define BLYNK_MAX_SENDBYTES 128
@@ -47,6 +57,164 @@
 #define VP_AUTO_NIGHT_STOP  V59
 
 #define interruptPin  25
+
+
+
+
+
+
+
+#define U_220_PIN 5       // контроль наличия 220в, с конденсатором, чтобы не реагировать на импульсы пропадания
+#define ONE_WIRE_PIN 5    // DS18b20
+//RNF SPI bus plus pins  9,10 для Уно или 9, 53 для Меги
+#define CE_PIN 6
+#define CSN_PIN 7
+#define RNF_MOSI      51
+#define RNF_MISO      50
+#define RNF_SCK       52
+
+//#define MP3_BUSY_PIN 11    // пин от BUSY плеера
+//#define BTTN_PIN 12       // ручное управление командами
+#define BZZ_PIN 5
+//#define MIC_PIN 14        // активация микрофона(т.е. переключение на микрофон вместо MP3)
+//#define REGISTRATOR_PIN 15// активация регистратора
+//#define ADD_DEVICE_PIN 16 // дополнительное устройство
+
+#define DHTTYPE DHT22
+
+#define bitRead(value, bit) (((value) >> (bit)) & 0x01)
+
+//DHT dht(DHT_PIN, DHTTYPE);
+//
+//Adafruit_SSD1306 display(OLED_RESET);
+
+// Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
+RF24 radio(CE_PIN, CSN_PIN);
+
+//const uint8_t arChannelsNRF[] = {0x60, 0x61, 0x62, 0x63};
+
+const unsigned long IN_UNKNOWN_ANSWER_PERIOD_S = 10;
+const unsigned long IN_ANSWER_PERIOD_S = 5;
+const unsigned long IN_UNKNOWN_CALL_TALK_PERIOD_S = 55;
+const unsigned long IN_CALL_TALK_PERIOD_S = 40;
+const unsigned long IN_DISCONNECT_PERIOD_S = 5;
+const unsigned long OUT_TONE_DISCONNECT_PERIOD_S = 10;
+const unsigned long OUT_NO_TONE_DISCONNECT_PERIOD_S = 15;
+//const unsigned long RECALL_NOANSWER_DISCONNECT_PERIOD_S = 20; //when recall without answer or without line
+const unsigned long OUTGOING_TALK_DISCONNECT_PERIOD_S = 30; //when recall with answer
+const unsigned long OUT_INFORM_PERIOD_S = 8;
+const unsigned long RECALL_PERIOD_S = 5;
+const unsigned long OUT_INFORM_PERIOD_1_S = 2;
+const unsigned long OUT_INFORM_PERIOD_2_S = 3;
+
+const unsigned long NRF_COMMUNICATION_INTERVAL_S = 10;
+const unsigned long REFRESH_SENSOR_INTERVAL_S = 100;
+const unsigned long BLOCK_UNKNOWN_PHONES_PERIOD_S = 1800; //30min
+const unsigned long MAX_ON_PERIOD_ADD_DEVICE_S = 3600; //60min ограничение максимального времени работы доп устройства
+const unsigned long ON_PERIOD_REGISTRATOR = 180; //3min времени работы регистратора
+const unsigned long VENT_CORRECTION_PERIOD_S = 30; //5min
+const unsigned long NAGREV_CONTROL_PERIOD_S = 60;
+const unsigned long AUTO_REFRESH_DISPLAY_PERIOD_S = 10;
+const unsigned long INPUT_COMMAND_DISPLAY_PERIOD_S = 60;
+const unsigned long GET_EXTERNAL_DATA_INTERVAL_S = 600;
+
+//Параметры комфорта
+const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
+const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;
+const float MAX_COMFORT_ROOM_TEMP = 24.5;
+const float BORDER_WINTER_SUMMER = 10; // +10c
+
+const int arCO2Levels[3] = {450, 600, 900};
+
+const byte INDEX_ALARM_PNONE = 1;                   //index in phonesEEPROM[5]
+const byte MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES = 3;  //После MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES неудачных попыток (с вводом неверного пароля) за последние 10 мин, блокируем (не берем трубку) звонки с любых неизвестных номеров на 30мин либо до звонка с известного номера (что раньше).
+const byte ADR_EEPROM_RECALL_ME = 1;                //useRecallMeMode
+const byte ADR_EEPROM_STORED_PHONES = 100;          //начало списка 7значных номеров телефонов (5шт по 11 байт)
+const byte ADR_EEPROM_PASSWORD_UNKNOWN_PHONES = 10; //начало пароля для доступа неопознанных тел-в
+const byte ADR_EEPROM_PASSWORD_ADMIN = 20;          //начало админского пароля
+
+const byte ADR_EEPROM_SCENARIO1_NAGREV = 100;   //начало адресов температур по комнатам для SCENARIO1_NAGREV; а последнем адресе - период работы сценария, часов
+const byte ADR_EEPROM_SCENARIO2_NAGREV = 110;   //начало температур для SCENARIO2_NAGREV
+const byte ADR_EEPROM_SCENARIO3_NAGREV = 120;   //начало температур для SCENARIO3_NAGREV
+
+const byte ADR_EEPROM_SCENARIO1_VENT = 200;     //начало адресов вент по комнатам для SCENARIO1_VENT; а последнем адресе - период работы сценария, часов
+const byte ADR_EEPROM_SCENARIO2_VENT = 210;     //начало вент для SCENARIO2_VENT
+const byte ADR_EEPROM_SCENARIO3_VENT = 220;     //начало вент для SCENARIO3_VENT
+
+const byte ROOM_NUMBER_OUT_T1 = ROOM_VENT;
+const byte ROOM_NUMBER_OUT_T2 = ROOM_SENSOR;
+
+boolean AlarmMode = false;
+boolean bNo220 = false;
+unsigned long displayPeriod = AUTO_REFRESH_DISPLAY_PERIOD_S;
+
+
+
+
+String _response = "";              // Переменная для хранения ответов модуля
+enum EnModeVent { V_AUTO_OFF, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_SPEED3, V_TO_AUTO, V_TO_SPEED1, V_TO_SPEED2, V_TO_SPEED3, V_SPEED1, V_SPEED2, V_SPEED3, V_TO_OFF, V_OFF };
+float t_inn[10];         //температура внутри, по комнатам
+byte h[10];              //влажность внутри, по комнатам
+int co2[10];             //co2 по комнатам
+float t_set[10];         //желаемая температура по комнатам
+float vent_set[10];      //желаемая вентиляция по комнатам
+boolean nagrevStatus[10];//состояние батарей по комнатам (true/false)
+EnModeVent modeVent[10]; //вентиляция по комнатам
+byte alarmStatus[10];    //alarm, по комнатам  //0-none, 1-medium, 2-serious
+byte alarmStatusNotification[10][2];    //alarm, раздать по комнатам:  статус//0-none, 1-medium, 2-serious + номера комнат
+//номера комнат подписчиков и поставщиков Alert bitRead(a, 0)
+byte arRoomsAlarmNotification[5] = {
+  0b00111010,
+  0b00111010,
+  0b00000000,
+  0b10000000,
+  0b10000001
+};
+
+
+float t_out1;   //температура снаружи место1
+float t_out2 = 99.99;   //температура снаружи место2
+float t_out;    //температура снаружи (минимальная место1 или место2)
+float t_vent;   //температура внутри вентиляционной системы (в блоке разветвления воздуха) для расчета (t_vent - t_out)
+float t_unit;   //температура блока управления (в самой горячей точке)
+float t_bat;    //температура батареи отопления (ближайшей)
+int p_v = 0;    //давление
+byte h_out = 0; //влажность снаружи
+
+
+elapsedMillis lastRefreshSensor_ms = REFRESH_SENSOR_INTERVAL_S * 1000;
+elapsedMillis lastNrfCommunication_ms;
+elapsedMillis blockUnknownPhones_ms;
+elapsedMillis ventCorrectionPeriod_ms;
+elapsedMillis nagrevControlPeriod_ms;
+elapsedMillis displayData_ms = AUTO_REFRESH_DISPLAY_PERIOD_S * 1000;
+elapsedMillis lastGetExternalData_ms = GET_EXTERNAL_DATA_INTERVAL_S * 1000;;
+
+OneWire ds(ONE_WIRE_PIN);
+DallasTemperature tempSensors(&ds);
+DeviceAddress outer1TempDeviceAddress;
+
+
+unsigned long c = 0;
+unsigned long ca = 0;
+
+String sSoftSerialData = "";
+
+NRFRequest nrfRequest;
+NRFResponse nrfResponse;
+boolean nrfCommandProcessing = false; //true when received nrf command
+
+//ESP https://istarik.ru/blog/esp8266/29.html
+//HardwareSerial & ESPport = Serial1; //ESP подключите к Serial1 (18, 19), скорость можно сделать 57600
+#define BUFFER_SIZE 128
+char esp_buffer[BUFFER_SIZE];
+
+
+
+
+
+
+
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
@@ -90,7 +258,7 @@ byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3
 homeMode_enum homeMode;
 homeMode_enum homeModeBeforeNight;
 
-unsigned count = 0;
+Adafruit_BMP085 bmp;
 BlynkTimer timer;
 WidgetTerminal terminal(VP_TERMINAL);
 
@@ -103,7 +271,6 @@ bool isWiFiConnected = false;
 int numTimerReconnect = 0;
 
 volatile float t_in;
-volatile float t_out;
 
 bool allowChangeSettings;
 bool motionDetected;
@@ -260,8 +427,416 @@ void setup()
   //backupDefaultTemp(); //1st time, comment after
   restoreDefaultTemp();
   restoreSettings();
+
+
+
+  pinMode(BZZ_PIN, OUTPUT);
+  RadioSetup();
+  bmp.begin();
+  tempSensors.begin();
+  tempSensors.getAddress(outer1TempDeviceAddress, 1);
+  tempSensors.setResolution(outer1TempDeviceAddress, 12);
+
+  for (byte iRoom = 0; iRoom < 5; iRoom++)
+  {
+    modeVent[iRoom] = V_AUTO_OFF;
+  }
+
+  //setSyncProvider(RTC.get);   // the function to get the time from the RTC
+
+
   isSetup = false;
 }
+
+void RadioSetup()
+{
+  //RF24
+  radio.begin();                          // Включение модуля;
+  delay(20);
+  radio.enableAckPayload();       //+
+  radio.setPayloadSize(32);
+  radio.setChannel(ArRoomsChannelsNRF[ROOM_SENSOR]);             // Установка канала вещания;
+  radio.setRetries(10, 10);               // Установка интервала и количества попыток "дозвона" до приемника;
+  radio.setDataRate(RF24_1MBPS);            // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
+  radio.setPALevel(RF24_PA_MAX);            // Установка максимальной мощности;
+  //radio.setAutoAck(0);                    // Установка режима подтверждения приема;
+  radio.openWritingPipe(RoomReadingPipe);   // Активация данных для отправки
+  radio.openReadingPipe(1, CentralReadingPipe);    // Активация данных для чтения
+  radio.startListening();
+
+  radio.printDetails();
+}
+
+void ReadCommandNRF() //from reponse
+{
+  if ( radio.available() )
+  {
+    bool done = false;
+    Serial.println("radio.available!!");
+    //while (!done)
+    //{
+    radio.read(&nrfResponse, sizeof(nrfResponse));
+    delay(20);
+    //radio.stopListening();
+    Serial.print("received data from room: ");
+    Serial.println(nrfResponse.roomNumber);
+    //}
+    ParseAndHandleInputNrfCommand();
+  }
+}
+
+void NrfCommunication()
+{
+  ResetExternalData();
+  if (lastNrfCommunication_ms > NRF_COMMUNICATION_INTERVAL_S * 1000)
+  {
+    //
+    //    radio.setChannel(ArRoomsChannelsNRF[ROOM_SENSOR]);
+    //    radio.openWritingPipe(ArRoomsReadingPipes[ROOM_SENSOR]); //for confirm writes
+    ReadCommandNRF(); // from ROOM_SENSOR
+    radio.stopListening();
+    for (byte iRoom = 0; iRoom < ROOM_SENSOR; iRoom++)
+    {
+      SendCommandNRF(iRoom);
+    }
+    radio.setChannel(ArRoomsChannelsNRF[ROOM_SENSOR]);
+    radio.startListening();
+    lastNrfCommunication_ms = 0;
+    FillAlarmStatuses();
+  }
+}
+
+void ResetExternalData()
+{
+  if (lastGetExternalData_ms > GET_EXTERNAL_DATA_INTERVAL_S * 1000)
+    t_out2 = 88.99;
+}
+
+void FillAlarmStatuses()
+{
+  memset(alarmStatusNotification, 0, 5); // обнуляем массив
+  for (byte iCheckRoom = 0; iCheckRoom <= 5; iCheckRoom++)
+  {
+    if (alarmStatus[iCheckRoom] > 0)
+    {
+      for (byte iNotifRoom = 0; iNotifRoom <= 5; iNotifRoom++)
+      {
+        if (bitRead(arRoomsAlarmNotification[iNotifRoom], iCheckRoom))
+        {
+          if (alarmStatus[iCheckRoom] > alarmStatusNotification[iNotifRoom][0])
+          {
+            alarmStatusNotification[iNotifRoom][0] = alarmStatus[iCheckRoom];
+            alarmStatusNotification[iNotifRoom][1] = iCheckRoom;
+          }
+        }
+      }
+    }
+  }
+}
+
+void PrepareRequestCommand(byte roomNumber)
+{
+  nrfRequest.Command = RQ_T_INFO;
+  nrfRequest.roomNumber = roomNumber;
+  nrfRequest.tOut = t_out;
+  nrfRequest.p_v = p_v;
+  nrfRequest.nagrevStatus = nagrevStatus[roomNumber];
+  if (roomNumber == ROOM_VENT)
+    switch (modeVent[ROOM_BED])
+    {
+      case V_AUTO_SPEED1:
+      case V_SPEED1:
+        nrfRequest.ventSpeed = 1;
+        break;
+      case V_AUTO_SPEED2:
+      case V_SPEED2:
+        nrfRequest.ventSpeed = 2;
+        break;
+      case V_AUTO_SPEED3:
+      case V_SPEED3:
+        nrfRequest.ventSpeed = 3;
+        break;
+      default:
+        nrfRequest.ventSpeed = 0;
+    }
+  nrfRequest.hours = tHour;
+  nrfRequest.minutes = tMinute;
+  nrfRequest.alarmMaxStatus = alarmStatusNotification[roomNumber][0];
+  nrfRequest.alarmRooms = alarmStatusNotification[roomNumber][1];
+  //  Serial.println("time:");
+  //  Serial.println(hour());
+  //  Serial.println(minute());
+}
+
+void SendCommandNRF(byte roomNumber)
+{
+  PrepareRequestCommand(roomNumber);
+
+  Serial.print("roomNumber: ");
+  Serial.println(roomNumber);
+  //radio.openWritingPipe(ArRoomsReadingPipes[roomNumber]);
+  radio.setChannel(ArRoomsChannelsNRF[roomNumber]);
+  if (radio.write(&nrfRequest, sizeof(nrfRequest)))
+  {
+    Serial.println("Success Send");
+    delay(10);
+    if (!radio.isAckPayloadAvailable() )   // Ждем получения..
+      Serial.println(F("Empty response."));
+    else
+    {
+      //  Serial.println(F("RESPONSE!."));
+      //ReadCommandNRF();
+
+      bool done = false;
+      //  Serial.println("radio.available!!");
+      //      while (!done)
+      //{
+      radio.read(&nrfResponse, sizeof(nrfResponse));
+      //done = radio.read(&nrfResponse, sizeof(nrfResponse));
+      delay(20);
+      //radio.stopListening();
+      Serial.print("received data from room: ");
+      Serial.println(nrfResponse.roomNumber);
+      //}
+      ParseAndHandleInputNrfCommand();
+    }
+  }
+  // else
+  // Serial.println("Failed Send");
+}
+
+void ParseAndHandleInputNrfCommand()
+{
+  nrfCommandProcessing = true;
+  Serial.print("roomNumber= ");
+  Serial.println(nrfResponse.roomNumber);
+  Serial.print("Tinn= ");
+  Serial.println(nrfResponse.tInn);
+
+  alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
+  t_inn[nrfResponse.roomNumber] = nrfResponse.tInn;
+  co2[nrfResponse.roomNumber] = nrfResponse.co2;
+
+  if (nrfResponse.roomNumber == ROOM_BED)
+  {
+    Serial.print("              CO2= ");
+    Serial.println(co2[ROOM_BED]);
+  }
+  if (nrfResponse.roomNumber == ROOM_VENT)
+  {
+    t_out1 = nrfResponse.tOut;
+    Serial.print("            Tout1= ");
+    Serial.println(nrfResponse.tOut);
+  }
+  if (nrfResponse.roomNumber == ROOM_SENSOR)
+  {
+    t_out2 = nrfResponse.tOut;
+    lastGetExternalData_ms = 0;
+    Serial.print("              Tout2= ");
+    Serial.println(nrfResponse.tOut);
+  }
+  //      h[nrfResponse.roomNumber] = nrfResponse.h;
+  //      t_set[nrfResponse.roomNumber] = nrfResponse.t_set;
+  //
+  //      switch (nrfResponse.alarmType) // { ALR_NO, ALR_VODA, ALR_DOOR }
+  //      {
+  //        case ALR_VODA:
+  //          InformCall(nrfResponse.roomNumber == ROOM_VANNA1 ? CI_VODA1 : CI_VODA2);
+  //          break;
+  //        case ALR_DOOR:
+  //          InformCall(nrfResponse.roomNumber == ROOM_HALL ? CI_ALARM1 : CI_ALARM2);
+  //          break;
+  //      }
+  //      break;
+  //
+  //    case IN_ROOM_COMMAND:
+  //V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEED1, V_TO_SPEED2, V_SPEED1, V_SPEED2, V_TO_OFF, V_OFF
+  //  switch (nrfResponse.ventSpeed) //0-not supported, 1,2,3: 1-3st speed, 10 - off, 100 - auto
+  //  {
+  //    case 10: //off
+  //      if (modeVent[nrfResponse.roomNumber] != V_OFF)
+  //        modeVent[nrfResponse.roomNumber] = V_TO_OFF;
+  //      break;
+  //    case 1: //1st speed
+  //      if (modeVent[nrfResponse.roomNumber] != V_SPEED1)
+  //        modeVent[nrfResponse.roomNumber] = V_TO_SPEED1;
+  //      break;
+  //    case 2: //2d speed
+  //      if (modeVent[nrfResponse.roomNumber] != V_SPEED2)
+  //        modeVent[nrfResponse.roomNumber] = V_TO_SPEED2;
+  //      break;
+  //    case 3: //3d speed
+  //      if (modeVent[nrfResponse.roomNumber] != V_SPEED3)
+  //        modeVent[nrfResponse.roomNumber] = V_TO_SPEED3;
+  //      break;
+  //    case 100: //auto
+  //      if (modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED1 &&
+  //          modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED2 &&
+  //          modeVent[nrfResponse.roomNumber] != V_AUTO_SPEED3 &&
+  //          modeVent[nrfResponse.roomNumber] != V_AUTO_OFF)
+  //      {
+  //        modeVent[nrfResponse.roomNumber] = V_TO_AUTO;
+  //      }
+  //      break;
+  //  }
+  //  Serial.print("modeVent= ");
+  //  Serial.println(modeVent[nrfResponse.roomNumber]);
+  //      break;
+  //
+  //    case IN_CENTRAL_COMMAND:
+  //      switch (nrfResponse.scenarioVent) //0-reset, 1, 2, 3
+  //      {
+  //        case 0: //off
+  //          ventMode = REQUEST_RESET_VENT;
+  //          break;
+  //        case 1: //1st scenario
+  //          ventMode = REQUEST_SCENARIO1_VENT;
+  //          break;
+  //        case 2:
+  //          ventMode = REQUEST_SCENARIO2_VENT;
+  //          break;
+  //        case 3:
+  //          ventMode = REQUEST_SCENARIO3_VENT;
+  //          break;
+  //      }
+  //      switch (nrfResponse.scenarioNagrev) //0-reset, 1, 2, 3
+  //      {
+  //        case 0: //off
+  //          nagrevMode = REQUEST_RESET_NAGREV;
+  //          break;
+  //        case 1: //1st scenario
+  //          nagrevMode = REQUEST_SCENARIO1_NAGREV;
+  //          break;
+  //        case 2:
+  //          nagrevMode = REQUEST_SCENARIO2_NAGREV;
+  //          break;
+  //        case 3:
+  //          nagrevMode = REQUEST_SCENARIO3_NAGREV;
+  //          break;
+  //      }
+  //      break;
+  //  }
+}
+
+void RefreshSensorData()
+{
+  if (lastRefreshSensor_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
+  {
+    Serial.println("RefreshSensorData");
+    tempSensors.requestTemperatures();
+    t_out1 = tempSensors.getTempCByIndex(0);
+    t_inn[ROOM_GOST] = tempSensors.getTempCByIndex(1);
+    //    //t_inn = tempSensors.getTempC(innerTempDeviceAddress);
+    //t_out1 = tempSensors.getTempC(outer1TempDeviceAddress);
+    //    t_vent = tempSensors.getTempC(ventTempDeviceAddress);
+    t_vent = t_out1;
+    //t_inn[ROOM_GOST] = tempSensors.getTempC(unitTempDeviceAddress);
+    t_out = (t_out2 < t_out1 || t_out1 < -100) && t_out2 > -100 ? t_out2 : t_out1;
+    Serial.print("t_out= ");
+    Serial.println(t_out);
+
+    //    h[ROOM_GOST] = dht.readHumidity();
+    //    t_inn[ROOM_GOST] = dht.readTemperature();
+    p_v = 0.0075 * bmp.readPressure();
+
+    lastRefreshSensor_ms = 0;
+  }
+}
+
+// V_TO_AUTO, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_OFF, V_TO_SPEED1, V_TO_SPEED2, V_SPEED1, V_SPEED2, V_TO_OFF, V_OFF
+void VentControl()
+{
+  if (ventCorrectionPeriod_ms > VENT_CORRECTION_PERIOD_S * 1000)
+  {
+    if (co2[ROOM_BED] == 0)
+      return;
+    float kT = 1;
+    if (t_out < -20)  //too cold
+      kT = 1.5;
+    else if (t_out < 30)
+      kT = (-4 * t_out + 525) / (float)arCO2Levels[1];
+    else  //too hot, >30
+      kT = 1.5;
+
+    //  Serial.print("modeVent=");
+    //  Serial.println(modeVent[ROOM_BED]);
+    //  Serial.print("t_vent=");
+    //  Serial.println(t_vent);
+    //  Serial.print("t_inn=");
+    //  Serial.println(t_inn[ROOM_BED]);
+    //  Serial.print("co2=");
+    //  Serial.println(co2[ROOM_BED]);
+
+    //for (byte i = 0; i < 5; i++)
+    switch (modeVent[ROOM_BED])
+    {
+      case V_TO_AUTO:
+      case V_AUTO_SPEED1:
+      case V_AUTO_SPEED2:
+      case V_AUTO_SPEED3:
+      case V_AUTO_OFF:
+        if (co2[ROOM_BED] > (arCO2Levels[3] * kT))
+          modeVent[ROOM_BED] = V_AUTO_SPEED2;
+        if (co2[ROOM_BED] > (arCO2Levels[2] * kT))
+          modeVent[ROOM_BED] = V_AUTO_SPEED2;
+        else if (co2[ROOM_BED] > (arCO2Levels[1] * kT))
+          modeVent[ROOM_BED] = V_AUTO_SPEED1;
+        else
+        {
+          Serial.print("      t_out=");
+          Serial.println(t_out);
+          Serial.print("      t_inn=");
+          Serial.println(t_inn[ROOM_BED]);
+          Serial.print("      kT=");
+          Serial.println(kT);
+          modeVent[ROOM_BED] = V_AUTO_OFF;
+        }
+        Serial.print("      CO2=");
+        Serial.println(co2[ROOM_BED]);
+
+        //reduce speed or off if too cold in room
+        if (t_inn[ROOM_BED] < (t_out < BORDER_WINTER_SUMMER ? MIN_COMFORT_ROOM_TEMP_WINTER : MIN_COMFORT_ROOM_TEMP_SUMMER) && t_inn[ROOM_BED] > t_vent)
+        {
+          if (modeVent[ROOM_BED] >= V_AUTO_SPEED1 && modeVent[ROOM_BED] > V_AUTO_SPEED1)
+            modeVent[ROOM_BED] = (EnModeVent)(modeVent[ROOM_BED] - 1);
+        }
+
+        //increase speed if too hot in room
+        if (t_inn[ROOM_BED] > MAX_COMFORT_ROOM_TEMP && t_inn[ROOM_BED] > t_out)
+        {
+          if (modeVent[ROOM_BED] >= V_AUTO_OFF && modeVent[ROOM_BED] < V_AUTO_SPEED2)
+            modeVent[ROOM_BED] = (EnModeVent)(modeVent[ROOM_BED] + 1);
+        }
+
+        break;
+
+      case V_TO_OFF:
+        modeVent[ROOM_BED] = V_OFF;
+        break;
+      case V_TO_SPEED1:
+        modeVent[ROOM_BED] = V_SPEED1;
+        break;
+      case V_TO_SPEED2:
+        modeVent[ROOM_BED] = V_SPEED2;
+        break;
+      case V_TO_SPEED3:
+        modeVent[ROOM_BED] = V_SPEED3;
+        break;
+    }
+
+    bool speed1 = (modeVent[ROOM_BED] == V_SPEED1 || modeVent[ROOM_BED] == V_AUTO_SPEED1);
+    bool speed2 = (modeVent[ROOM_BED] == V_SPEED2 || modeVent[ROOM_BED] == V_AUTO_SPEED2);
+
+    nrfRequest.Command = RQ_VENT;
+    nrfRequest.ventSpeed = speed1 ? 1 : speed2 ? 2 : 0;
+
+    ventCorrectionPeriod_ms = 0;
+
+    Serial.print("modeVent[ROOM_BED]");
+    Serial.println(modeVent[ROOM_BED]);
+  }
+}
+
 
 BLYNK_CONNECTED()
 {
@@ -1009,7 +1584,14 @@ void loop()
 {
   BlynkRun();
   timer.run();
+
+
+  RefreshSensorData();
+  NrfCommunication(); //read / send / read response
+  VentControl();
+  //wdt_reset();
 }
+
 
 //void receiveJsonDataBySerial()
 //{
