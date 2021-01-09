@@ -15,7 +15,7 @@
 #include "sav_button.h" // Библиотека работы с кнопками
 #include <RF24.h>
 #include <RF24_config.h>
-#include <Adafruit_BMP085.h> //давление Vcc – +5в; SDA – (A4);SCL - (A5)
+#include <Adafruit_BMP085.h> //давление Vcc – +5в; //esp32 SDA(SDI) – 21;SCL(SCK) - 22 //mega SDA – A4;SCL - A5
 
 //#include <util/delay.h>
 
@@ -59,19 +59,15 @@
 #define interruptPin  25
 
 
-
-
-
-
-
 #define U_220_PIN 5       // контроль наличия 220в, с конденсатором, чтобы не реагировать на импульсы пропадания
 #define ONE_WIRE_PIN 5    // DS18b20
 //RNF SPI bus plus pins  9,10 для Уно или 9, 53 для Меги
-#define CE_PIN 6
-#define CSN_PIN 7
-#define RNF_MOSI      51
-#define RNF_MISO      50
-#define RNF_SCK       52
+//NRF24L01 для ESP32 - ce-17, cs-5, sck-18, miso-19, mosi-23)
+#define CE_PIN        17  //6
+#define CSN_PIN       5   //7
+#define RNF_MOSI      23  //51
+#define RNF_MISO      19  //50
+#define RNF_SCK       18  //52
 
 //#define MP3_BUSY_PIN 11    // пин от BUSY плеера
 //#define BTTN_PIN 12       // ручное управление командами
@@ -89,7 +85,7 @@
 //Adafruit_SSD1306 display(OLED_RESET);
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
-RF24 radio(CE_PIN, CSN_PIN);
+RF24 radio(CE_PIN, CSN_PIN); //esp32 NRF24L01 - ce-17, cs-5, sck-18, miso-19, mosi-23)
 
 //const uint8_t arChannelsNRF[] = {0x60, 0x61, 0x62, 0x63};
 
@@ -1587,8 +1583,8 @@ void loop()
 
 
   RefreshSensorData();
-  NrfCommunication(); //read / send / read response
-  VentControl();
+  //NrfCommunication(); //read / send / read response
+  //VentControl();
   //wdt_reset();
 }
 

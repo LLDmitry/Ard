@@ -1,3 +1,7 @@
+Беспроводной умный дом. Шлюз MySensors на esp32 и nrf24L01+
+https://www.youtube.com/watch?v=x2VyzdptbrA
+
+
 1
 C:\Program Files (x86)\Arduino\libraries\RF24-master\RF24_config.h
 >
