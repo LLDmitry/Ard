@@ -42,8 +42,8 @@ volatile float t_out;
 volatile unsigned long totalStatisticNagrev = 0;
 volatile unsigned long currentStatisticNagrev = 0;
 
-const double MIN_T = 1.0; //диапозон температур внутри ящика
-const double MAX_T = 2.0; //диапозон температур внутри ящика
+const float MIN_T = 1.0; //диапозон температур внутри ящика
+const float MAX_T = 2.0; //диапозон температур внутри ящика
 
 const unsigned long SHOW_MODE_DELAY_S = 2; //sec
 const unsigned long REFRESH_SENSOR_INTERVAL_S = 30;   //1 мин
