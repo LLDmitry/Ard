@@ -8,7 +8,8 @@
 #include <Arduino.h>
 #include <avr/wdt.h>
 #include <RF24.h>
-#include <RF24_config.h>
+//#include <nRF24L01.h>
+//#include <RF24_config.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
@@ -105,7 +106,6 @@ void setup()
   delay(2);
   radio.enableAckPayload();                     // Allow optional ack payloads
   //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
-
   radio.setPayloadSize(32); //18
   radio.setChannel(ArRoomsChannelsNRF[ROOM_NUMBER]);            // Установка канала вещания;
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
@@ -153,7 +153,7 @@ void RefreshSensorData()
     Serial.println("RefreshSensorData");
     //    sensors.requestTemperatures();
     //    t_inn = sensors.getTempC(InnTempDeviceAddress);
-    t_inn = nrfRequest.tOut; //debug
+    t_inn = 15.6; //debug
     //    t_out = sensors.getTempC(OutTempDeviceAddress);
     //    //t_hot = sensors.getTempC(HotVodaTempDeviceAddress);
     //
@@ -198,6 +198,7 @@ void ReadCommandNRF()
       _delay_ms(20);
       Serial.println("radio.read: ");
       Serial.println(nrfRequest.roomNumber);
+      Serial.println(nrfRequest.p_v);
       Serial.println(nrfRequest.Command);
       Serial.println(nrfRequest.minutes);
       Serial.println(nrfRequest.tOut);
