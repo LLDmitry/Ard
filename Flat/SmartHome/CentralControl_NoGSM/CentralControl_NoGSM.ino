@@ -369,10 +369,11 @@ void setup()
   //    Serial.println("Unable to sync with the RTC");
   //  else
   //    Serial.println("RTC has set the system time");
+
   //Устанавливаем время в формате: Часы, минуты, секунды, день, месяц, год
-  //  setTime(22, 35, 0, 5, 2, 2019);
-  //  //Применяем:
-  //  RTC.set(now());
+  //    setTime(10, 0, 0, 22, 1, 2022);
+  //    //Применяем:
+//      RTC.set(now());
 
   //ESP
   ////Serial.begin(9600); // Терминал
@@ -1636,9 +1637,12 @@ void PrepareRequestCommand(byte roomNumber)
   nrfRequest.minutes = minute();
   nrfRequest.alarmMaxStatus = alarmStatusNotification[roomNumber][0];
   nrfRequest.alarmRooms = alarmStatusNotification[roomNumber][1];
-  //  Serial.println("time:");
-  //  Serial.println(hour());
-  //  Serial.println(minute());
+  if (roomNumber == 0)
+  {
+    Serial.println("time:");
+    Serial.println(hour());
+    Serial.println(minute());
+  }
 }
 
 void SendCommandNRF(byte roomNumber)
@@ -1809,6 +1813,8 @@ void RefreshSensorData()
     //    h[ROOM_GOST] = dht.readHumidity();
     //    t_inn[ROOM_GOST] = dht.readTemperature();
     p_v = 0.075 * bmp.readPressure();
+    Serial.print("P= ");
+    Serial.println(p_v);
 
     lastRefreshSensor_ms = 0;
   }
