@@ -50,12 +50,12 @@
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 #define RNF_CE_PIN    6
 #define RNF_CSN_PIN   7
-//#define RNF_MOSI      11
-//#define RNF_MISO      12
-//#define RNF_SCK       13
-#define RNF_MOSI      51
-#define RNF_MISO      50
-#define RNF_SCK       52
+#define RNF_MOSI      11
+#define RNF_MISO      12
+#define RNF_SCK       13
+//#define RNF_MOSI      51
+//#define RNF_MISO      50
+//#define RNF_SCK       52
 
 #define TFT_CS        10                  // Указываем пины cs
 #define TFT_DC        9                   // Указываем пины dc (A0)
@@ -270,7 +270,7 @@ void ReadCommandNRF()
       //while (!done) {                            // Упираемся и
       radio.read(&nrfRequest, sizeof(nrfRequest)); // по адресу переменной nrfRequest функция записывает принятые данные
       _delay_ms(20);
-      //radio.flush_rx();
+      radio.flush_rx();
       Serial.println("radio.read: ");
       _delay_ms(20);
       Serial.println(nrfRequest.Command);
