@@ -1,5 +1,6 @@
 //Для управления (с дисплеем и кнопками) температурой в каждой комнате и связи с CentralControl.
 //Также передает сигнал тревоги в CentralControl. Для некоторых комнат включает сигнал тревоги
+//попеременно показывает iInn+tSet и tOut
 
 #include <EEPROM.h>
 #include <NrfCommandsESP32.h> // C:\Program Files (x86)\Arduino\libraries\NrfCommandsESP32
@@ -8,8 +9,6 @@
 #include <Arduino.h>
 #include <avr/wdt.h>
 #include <RF24.h>
-//#include <nRF24L01.h>
-//#include <RF24_config.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
@@ -44,6 +43,8 @@ const unsigned long ALARM_INTERVAL_S = 2;
 const unsigned long REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const unsigned long READ_COMMAND_NRF_INTERVAL_S = 1;
 const unsigned long CHECK_ALARM_SENSOR_PERIOD_S = 10;
+const unsigned long SHOW_TMP_INN_S = 10;
+const unsigned long SHOW_TMP_OUT_S = 3;
 
 const int EEPROM_ADR_SET_TEMP = 1023; //last address in eeprom for store tSet
 const float T_SET_MIN = 1.0f;  //0.0f - off
@@ -67,17 +68,22 @@ elapsedMillis checkAlarmSensor_ms;
 elapsedMillis alarmInterval_ms;
 elapsedMillis lastRefreshSensor_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 elapsedMillis readCommandNRF_ms = 0;
+elapsedMillis displayMode_ms = 0;
 
 bool alarmSensor = false;
-bool t_set_on = false;
-float t_set = 21.0f;
 float t_inn = 0.0f;
 float t_out = 0.0f;
 boolean heaterStatus = false;
 volatile boolean isAlarm = false;
+enum enDisplayMode { DISPLAY_AUTO, DISPLAY_INN_TMP, DISPLAY_OUT_TMP, DISPLAY_ALARM };
+enDisplayMode displayMode = DISPLAY_INN_TMP;
 
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
+
+bool t_set_on = false;
+byte t_set = 4; //set_temp[4-1]
+byte set_temp [5] = {2, 15, 21, 22, 23};
 
 void setup()
 {
@@ -96,10 +102,7 @@ void setup()
   btnP.begin();
   btnM.begin();
 
-  byte val;
-  EEPROM.get(EEPROM_ADR_SET_TEMP, val);
-  t_set = ConvertFromByte(1, val);
-  //EEPROM.get(EEPROM_ADR_SET_TEMP + 1, t_set_on);
+  RestoreFromEEPROM();
 
   // RF24
   radio.begin();                          // Включение модуля;
@@ -130,6 +133,17 @@ void setup()
   display.clearDisplay();
 
   wdt_enable(WDTO_8S);
+}
+
+void RestoreFromEEPROM()
+{
+  //byte val;
+  EEPROM.get(EEPROM_ADR_SET_TEMP, t_set);
+  EEPROM.get(EEPROM_ADR_SET_TEMP + 1, t_set_on);
+  for (int s = 1; s <= 5; s++)
+  {
+    EEPROM.get(EEPROM_ADR_SET_TEMP + 1 + s, set_temp[s - 1]);
+  }
 }
 
 void PrepareCommandNRF()
@@ -198,7 +212,7 @@ void ReadCommandNRF()
       _delay_ms(20);
       Serial.println("radio.read: ");
       Serial.println(nrfRequest.roomNumber);
-      Serial.println(nrfRequest.p_v);
+      Serial.println(nrfRequest.p);
       Serial.println(nrfRequest.Command);
       Serial.println(nrfRequest.minutes);
       Serial.println(nrfRequest.tOut);
@@ -214,13 +228,13 @@ void ReadCommandNRF()
       //        radio.powerUp();
       //      }
       //      if (nrfRequest.Command != RQ_NO) {
-      //        HandleInputNrfCommand();
+      HandleInputNrfCommand();
       //      };
 
       nrfResponse.Command == RSP_NO;
       //      nrfResponse.tOut = 99.9;
       nrfResponse.tInn = t_inn;
-      //      nrfResponse.tSetOn = t_set_on;
+      nrfResponse.tInnSet = t_set;
       //nrfResponse.alarmSensor = alarmSensor;
       //}
     }
@@ -236,8 +250,26 @@ void HandleInputNrfCommand()
   {
     //Serial.print("tSet= ");
     //Serial.println(nrfRequest.tSet);
-    t_set = nrfRequest.tInnSet;
-    t_set_on = t_set >= 0;
+    t_out = nrfRequest.tOut;
+    t_out = t_out + ((float)nrfRequest.tOutDec / 10.0f);
+    if (nrfRequest.tOutSign == '-')
+      t_out = -t_out ;
+    if (nrfRequest.tInnSet < 100)
+    {
+      t_set = nrfRequest.tInnSet;
+      t_set_on = t_set >= 0;
+    }
+    if (nrfRequest.tInnSetVal1 <= 30)
+      set_temp[0] = nrfRequest.tInnSetVal1;
+    if (nrfRequest.tInnSetVal2 <= 30)
+      set_temp[1] = nrfRequest.tInnSetVal2;
+    if (nrfRequest.tInnSetVal3 <= 30)
+      set_temp[2] = nrfRequest.tInnSetVal3;
+    if (nrfRequest.tInnSetVal4 <= 30)
+      set_temp[3] = nrfRequest.tInnSetVal4;
+    if (nrfRequest.tInnSetVal5 <= 30)
+      set_temp[4] = nrfRequest.tInnSetVal5;
+
     SaveTSetEEPROM();
     HeaterControl();
     //isAlarm = nrfRequest.isAlarm; //central send it to one room
@@ -269,26 +301,44 @@ float ConvertFromByte(byte param, byte val)
 
 void SaveTSetEEPROM()
 {
-  EEPROM.put(EEPROM_ADR_SET_TEMP, ConvertToByte(1, t_set));
-  //EEPROM.put(EEPROM_ADR_SET_TEMP + 1, ConvertToByte(2, t_set_on));
+  EEPROM.put(EEPROM_ADR_SET_TEMP, t_set);
+  EEPROM.put(EEPROM_ADR_SET_TEMP + 1, t_set_on);
+
+  for (int s = 1; s <= 5; s++)
+  {
+    EEPROM.put(EEPROM_ADR_SET_TEMP + 1 + s, set_temp[s - 1]);
+  }
 }
 
 void HeaterControl()
 {
   Serial.println("HeaterControl");
-  heaterStatus =  (t_set_on && t_set > t_inn);
+  heaterStatus =  (t_set_on && set_temp[t_set - 1] > t_inn);
   digitalWrite(HEATER_PIN, heaterStatus);
-  DisplayData();
+  DisplayData(DISPLAY_INN_TMP);
 }
 
 void ChangeSetTemp(int sign)
 {
-  if (sign == 1 && t_set < T_SET_MAX)
-    t_set += 1;
-  else if (sign == -1 && t_set > T_SET_MIN)
-    t_set -= 1;
+  if (sign == 1)
+  {
+    t_set_on = true;
+    if (t_set < T_SET_MAX)
+      t_set += 1;
+  }
+  else if (sign == -1)
+  {
+    if (t_set > 1)
+    {
+      t_set_on = true;
+      t_set -= 1;
+    }
+    else
+      t_set_on = false;
+  }
   else if (sign == "!")
     t_set_on = !t_set_on;
+
   SaveTSetEEPROM();
   HeaterControl();
 }
@@ -317,50 +367,92 @@ void CheckButtons()
   }
 }
 
-void DisplayData()
+void DisplayData(enDisplayMode toDisplayMode)
 {
-  Serial.println("DisplayData");
-  // t_inn = 25.7;
-  //t_set = 28;
-
-  //  Serial.print("t_inn ");
-  //  Serial.println((int)t_inn);
-  //  Serial.print("t_set ");
-  //  Serial.println((int)t_set);
-
-  //display.setFont(&FreeSerif9pt7b);
-  display.clearDisplay();
-  display.display();
-  //delay(2000);
-
-  if ((int)t_inn < 0)
+  if (toDisplayMode != DISPLAY_AUTO || displayMode == DISPLAY_INN_TMP && displayMode_ms > SHOW_TMP_INN_S * 1000 || (displayMode == DISPLAY_OUT_TMP || displayMode == DISPLAY_ALARM) && displayMode_ms > SHOW_TMP_OUT_S * 1000)
   {
-    display.setTextSize(2);
-    display.setCursor(1, 30);
-    display.println("-");
+    if (toDisplayMode == DISPLAY_AUTO)
+    {
+      if (displayMode == DISPLAY_INN_TMP)
+        displayMode = DISPLAY_OUT_TMP;
+      else
+        displayMode = DISPLAY_INN_TMP;
+    }
+    else
+    {
+      if (toDisplayMode = DISPLAY_ALARM)
+      {
+        displayMode_ms = 0;
+      }
+      else if (toDisplayMode = DISPLAY_INN_TMP)
+      {
+        displayMode = DISPLAY_INN_TMP;
+        displayMode_ms = 0;
+      }
+    }
+
+
+    //display.setFont(&FreeSerif9pt7b);
+    display.clearDisplay();
+    display.display();
+
+    if (displayMode == DISPLAY_INN_TMP)
+    {
+      if ((int)t_inn < 0)
+      {
+        display.setTextSize(2);
+        display.setCursor(1, 30);
+        display.println("-");
+      }
+
+      display.setTextSize(5);
+      display.setTextColor(WHITE);
+      display.setCursor(15, 18);
+      display.println(abs((int)t_inn));
+
+      if (t_set_on)
+      {
+        byte x, y;
+        if ((int)set_temp[t_set - 1] < 10)
+          x = 100;
+        else
+          x = 88;
+        display.setTextSize(3);
+        if ((int)t_inn < (int)set_temp[t_set - 1])
+          y = 8;
+        else if ((int)t_inn > (int)set_temp[t_set - 1])
+          y = 42;
+        else
+          y = 20;
+        display.setCursor(x, y);
+        display.println((int)set_temp[t_set - 1]);
+      }
+      else
+      {
+        display.setCursor(100, 20);
+        display.println("OFF");
+      }
+    }
+    else if (displayMode == DISPLAY_OUT_TMP)
+    {
+      //внешняя температура - внутри рамки
+      byte i = 3;
+      display.drawRect(i, i, display.width() - 2 * i, display.height() - 2 * i, SSD1306_WHITE);
+      display.setCursor(35, 18);
+      display.println(abs(t_out));
+    }
+    else if (displayMode == DISPLAY_ALARM)
+    {
+      display.setCursor(100, 10);
+      display.println("ALARM");
+      //display.setCursor(100, 30);
+      //display.println(alarmMaxStatus);
+      //display.setCursor(100, 60);
+      //display.println(alarmMaxStatusRoom);
+    }
+    display.display();
+    delay(200);
   }
-
-  display.setTextSize(5);
-  display.setTextColor(WHITE);
-  display.setCursor(15, 18);
-  display.println(abs((int)t_inn));
-
-  byte x, y;
-  if ((int)t_set < 10)
-    x = 100;
-  else
-    x = 88;
-  display.setTextSize(3);
-  if ((int)t_inn < (int)t_set)
-    y = 8;
-  else if ((int)t_inn > (int)t_set)
-    y = 42;
-  else
-    y = 20;
-  display.setCursor(x, y);
-  display.println((int)t_set);
-  display.display();
-  delay(200);
 }
 
 void loop()
@@ -369,5 +461,6 @@ void loop()
   RefreshSensorData();
   CheckAlarmSensor();
   ReadCommandNRF();
+  DisplayData(DISPLAY_AUTO);
   wdt_reset();
 }

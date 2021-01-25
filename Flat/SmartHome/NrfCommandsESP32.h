@@ -1,5 +1,5 @@
 /*
- общие переменные и структуры для домашних модулей
+ общие переменные и структуры для домашних модулей ESP+Atmega
 */
 #ifndef NrfCommands_h
 #define NrfCommands_h
@@ -21,36 +21,47 @@ enum enResponseCommand { RSP_NO, RSP_INFO, RSP_COMMAND };
 enum enAlarmType { ALR_NO, ALR_VODA, ALR_MOTION, ALR_PEREGREV };
 enum enRooms { ROOM_GOST, ROOM_BED, ROOM_KITCHEN, ROOM_HALL, ROOM_GUEST1, ROOM_GUEST2, ROOM_VANNA1, ROOM_VANNA2, ROOM_VENT, ROOM_SENSOR};
 
+//!!! все property д.б. byte, иначе будет разная длина в Atmega и ESP32
+//Request - от Central к Room
 typedef struct {
-  byte Command;               //1b  тип команды
-  byte roomNumber; 	          //1b команда для комнаты №
-  byte tOut;                  //2b внешняя темп
-  byte tOutDec;                  //2b внешняя темп
-  byte p_v;                   //2b атм давление
-  byte hours;                 //1b текущее время
-  byte minutes;               //1b
-  byte tInnSet;               //1b установить температуру в комнате   0-off, 1...
-  byte ventSpeed;             //1b установить скорость вентилятора (для комнат где есть вентилятор)
-  byte alarmMaxStatus;        //1b инф-я о max из статусов тревоги для отображения
-  byte alarmMaxStatusRoom;  	//1b № комнаты с alarmMaxStatus
-} NRFRequest;         	//15b
+  byte Command;               //тип команды
+  byte roomNumber; 	          //команда для комнаты №
+  byte tOutSign;              //внешняя темп  '+' '-'
+  byte tOut;                  //внешняя темп
+  byte tOutDec;               //внешняя темп десятые
+  byte p;                     //атм давление, целая часть - 600
+  byte pDec;                  //атм давление, десятые
+  byte hours;                 //текущее время
+  byte minutes;               //текущее время
+  byte tInnSet = 100;         //установить температуру в комнате  set_temp[k], k = 0 - выкл, 1..5, 100 - оставить без изменений. 
+  byte tInnSetVal1 = 100;       //установка температуры в комнате  1е значение 0..30, 100 - оставить без изменений
+  byte tInnSetVal2 = 100;       //установка температуры в комнате  2е значение 0..30, 100 - оставить без изменений
+  byte tInnSetVal3 = 100;       //установка температуры в комнате  3е значение 0..30, 100 - оставить без изменений
+  byte tInnSetVal4 = 100;       //установка температуры в комнате  4е значение 0..30, 100 - оставить без изменений
+  byte tInnSetVal5 = 100;       //установка температуры в комнате  5е значение 0..30, 100 - оставить без изменений
+  byte ventSpeed;             //установить скорость вентилятора (для комнат где есть вентилятор)
+  byte alarmMaxStatus;        //инф-я о max из статусов тревоги для отображения
+  byte alarmMaxStatusRoom;  	//№ комнаты с alarmMaxStatus
+} NRFRequest;         	//18b
 
+//Response - от Room к Central
 typedef struct {
-  byte Command = RSP_NO;                                                         //1
-  byte roomNumber;  //1,2,3,4                                                                 //1
-  byte tInn;                                                                                 //4
-  byte tInnDec;                                                                                 //4
-  //float tOut = -100;      //-100 или T если в комнате есть сбор t_Out                         //4
-  byte tOut;                  //2b внешняя темп
-  byte tOutDec;                  //2b внешняя темп
-  byte tInnSet;	                                                                              //1   0 - выкл, 1..
+  byte Command = RSP_NO;                                                         
+  byte roomNumber;                                                                            //1,2,3,4                                                    
+  byte tInnSign;                                                                              //внутр темп  '+' '-'
+  byte tInn;                                                                                  //целая часть
+  byte tInnDec;                                                                               //десятые
+  byte tOutSign;                                                                              //внешняя темп  '+' '-'
+  byte tOut;                                                                                  //внешняя темп
+  byte tOutDec;                                                                               //внешняя темп десятые
+  byte tInnSet = 100;	                                                                        //set_temp[k], k =0 - выкл, 1..5 , 100 - оставить без изменений
   byte nagrevStatus;                                                                          //1
-  byte t1;      	                                                                            //1
-  byte t2;	                                                                                  //1
-  byte co2;                                                                               //2
-  byte h;                                                                                     //1
-  byte alarmType = ALR_NO;  //voda/motion alarm/...                                    //1    
-} NRFResponse;  //18b
+  byte addParam1;      	                                                                      // 0..255
+  byte addParam2;      	                                                                      // 0..255
+  byte co2;                                                                                   //co2/10
+  byte h;                                                                                     //влажность, целая часть
+  byte alarmType = ALR_NO;                                                                    //voda/motion alarm/...
+} NRFResponse;  //15b
  
 void EmptyF();
 #endif

@@ -1,4 +1,3 @@
-//#include <printf.h>
 #include <RF24.h>
 #include <RF24_config.h>
 
@@ -12,15 +11,11 @@
 #include <Preferences.h>
 
 #include <NrfCommandsESP32.h> // C:\Program Files (x86)\Arduino\libraries\NrfCommandsESP32
-//#include <NrfCommands.h> // C:\Program Files (x86)\Arduino\libraries\NrfCommands
-//#include <SoftwareSerial.h>
 #include <elapsedMillis.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include "sav_button.h" // Библиотека работы с кнопками
 #include <RF24.h>
-//#include <nRF24L01.h>
-//#include <RF24_config.h>
 #include <Adafruit_BMP085.h> //давление Vcc – +5в; //esp32 SDA(SDI) – 21;SCL(SCK) - 22 //mega SDA – A4;SCL - A5
 
 //#include <util/delay.h>
@@ -492,9 +487,11 @@ void PrepareRequestCommand(byte roomNumber)
   nrfRequest.roomNumber = roomNumber;
   //nrfRequest.tOut = t_out;
   nrfRequest.tOut = random(30);
+  nrfRequest.tOutDec = random(9);
   Serial.println(nrfRequest.tOut);
-  nrfRequest.p_v = p_v;
-  //nrfRequest.tInnSet = t_set[roomNumber];
+  nrfRequest.p = (int)((p_v - 6000) / 10);
+  nrfRequest.pDec = (p_v - 6000) % 10;
+  nrfRequest.tInnSet = t_set[roomNumber];
   //nrfRequest.nagrevStatus = nagrevStatus[roomNumber];
   if (roomNumber == ROOM_VENT)
     switch (modeVent[ROOM_BED])
@@ -575,6 +572,11 @@ void ParseAndHandleInputNrfCommand()
   if (nrfResponse.roomNumber == ROOM_VENT)
   {
     t_out1 = nrfResponse.tOut;
+    t_out1 = t_out1 + (nrfResponse.tOutDec / 10);
+    if (nrfResponse.tOutSign == 1)
+    {
+      t_out1 = t_out1 * (-1);
+    }
     Serial.print("            Tout1= ");
     Serial.println(nrfResponse.tOut);
   }
