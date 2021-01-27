@@ -6,10 +6,10 @@
  
 #include "Arduino.h"
 
-const uint64_t CentralReadingPipe = 0xE8E8F0F0ABLL;  //Mega  д.б. один для всех rooms, = readingPipe CentralControl 
-const uint64_t RoomReadingPipe = 0xE8E8F0F0AALL;  //Mega  д.б. один для всех rooms
-//const uint64_t CentralReadingPipe = 0xF0F0F0F0A1LL;  //ESP32 д.б. один для всех rooms, = readingPipe CentralControl 
-//const uint64_t RoomReadingPipe =    0xF0F0F0F0A2LL;  //ESP32 д.б. один для всех rooms
+//const uint64_t CentralReadingPipe = 0xE8E8F0F0ABLL;  //Mega  д.б. один для всех rooms, = readingPipe CentralControl 
+//const uint64_t RoomReadingPipe = 0xE8E8F0F0AALL;  //Mega  д.б. один для всех rooms
+const uint64_t CentralReadingPipe = 0xF0F0F0F0A1LL;  //ESP32 д.б. один для всех rooms, = readingPipe CentralControl 
+const uint64_t RoomReadingPipe =    0xF0F0F0F0A2LL;  //ESP32 д.б. один для всех rooms
 
 const uint8_t ArRoomsChannelsNRF[] = {50, 51, 52, 53, 54, 55, 56, 57, 58, 59};
 

@@ -441,7 +441,8 @@ void NrfCommunication()
     //ReadCommandNRF(); // from ROOM_SENSOR                                         пока отключил!!!
     Serial.println("                       radio.stopListening();");
     radio.stopListening();
-    for (byte iRoom = 0; iRoom < ROOM_SENSOR; iRoom++)
+    //d for (byte iRoom = 0; iRoom < ROOM_SENSOR; iRoom++)
+    for (byte iRoom = 0; iRoom < 3; iRoom++)
     {
       SendCommandNRF(iRoom);
     }
@@ -488,10 +489,15 @@ void PrepareRequestCommand(byte roomNumber)
   //nrfRequest.tOut = t_out;
   nrfRequest.tOut = random(30);
   nrfRequest.tOutDec = random(9);
+  Serial.print("roomNumber    ");
+  Serial.println(roomNumber);
   Serial.println(nrfRequest.tOut);
+  Serial.println(p_v);
   nrfRequest.p = (int)((p_v - 6000) / 10);
   nrfRequest.pDec = (p_v - 6000) % 10;
   nrfRequest.tInnSet = t_set[roomNumber];
+  Serial.print("nrfRequest.tInnSet= ");
+  Serial.println(nrfRequest.tInnSet);
   //nrfRequest.nagrevStatus = nagrevStatus[roomNumber];
   if (roomNumber == ROOM_VENT)
     switch (modeVent[ROOM_BED])
@@ -696,11 +702,10 @@ void RefreshSensorData()
     Serial.print(bmp.readTemperature());
     Serial.println(" *C");
 
-    p_v = 0.0075 * bmp.readPressure();
-    Serial.print("Pressure = ");
+    p_v = 0.075 * bmp.readPressure();
+    Serial.print("Pressure*10 = ");
     Serial.print(p_v);
     Serial.println(" мм Рт ст");
-    Serial.println("A4");
     lastRefreshSensor_ms = 0;
     Serial.println("                      DONE RefreshSensorData");
   }
@@ -873,14 +878,14 @@ void refreshAllTemperatures() {
 }
 
 void every10SecTimer() {
-  if (motionDetected && homeMode == GUARD_MODE)
-  {
-    // Blynk.virtualWrite(VP_ALARM_STATUS, HIGH);
-    String lbl = "Тревога " + (String)tHour + ":" + (tMinute < 10 ? "0" : "") + (String)tMinute;
-    Blynk.setProperty(VP_ALARM_BTN, "onLabel", lbl);
-    Blynk.notify(lbl);
-    Blynk.virtualWrite(VP_ALARM_BTN, HIGH);
-  }
+  //d  if (motionDetected && homeMode == GUARD_MODE)
+  //  {
+  //    // Blynk.virtualWrite(VP_ALARM_STATUS, HIGH);
+  //    String lbl = "Тревога " + (String)tHour + ":" + (tMinute < 10 ? "0" : "") + (String)tMinute;
+  //    Blynk.setProperty(VP_ALARM_BTN, "onLabel", lbl);
+  //    Blynk.notify(lbl);
+  //    Blynk.virtualWrite(VP_ALARM_BTN, HIGH);
+  //  }
   motionDetected = false;
 }
 
