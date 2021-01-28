@@ -78,6 +78,7 @@ bool alarmSensor = false;
 float t_inn = 0.0f;
 float t_out = 0.0f;
 byte t_outInt = 0;
+byte t_outSign = '+';
 byte t_outDec = 0;
 boolean heaterStatus = false;
 volatile boolean isAlarm = false;
@@ -247,6 +248,8 @@ void HandleInputNrfCommand()
   {
     //Serial.print("tSet= ");
     //Serial.println(nrfRequest.tSet);
+    //t_outSign = nrfRequest.tOutSign;
+    t_outSign = '-';
     t_outInt = nrfRequest.tOut;
     t_outDec = nrfRequest.tOutDec;
     t_out = t_outInt + ((float)nrfRequest.tOutDec / 10.0f);
@@ -284,6 +287,7 @@ void HandleInputNrfCommand()
     //isAlarm = nrfRequest.isAlarm; //central send it to one room
   }
 }
+
 
 byte ConvertToByte(byte param, float val) //0..255
 {
@@ -383,10 +387,6 @@ void DisplayData(enDisplayMode toDisplayMode)
 {
   if (toDisplayMode != DISPLAY_AUTO || displayMode == DISPLAY_INN_TMP && displayMode_ms > SHOW_TMP_INN_S * 1000 || (displayMode == DISPLAY_OUT_TMP || displayMode == DISPLAY_ALARM) && displayMode_ms > SHOW_TMP_OUT_S * 1000)
   {
-    Serial.println("DD_1");
-    Serial.print("displayMode = ");
-    Serial.println(displayMode);
-    _delay_ms(10);
     if (toDisplayMode == DISPLAY_AUTO)
     {
       if (displayMode == DISPLAY_INN_TMP)
@@ -406,19 +406,13 @@ void DisplayData(enDisplayMode toDisplayMode)
     }
     displayMode_ms = 0;
 
-    Serial.println("DD2");
-    _delay_ms(10);
-
     //display.setFont(&FreeSerif9pt7b);
     display.clear();
-    Serial.println("DD21");
     display.update();
     _delay_ms(10);
-    Serial.println("DD3");
 
     if (displayMode == DISPLAY_INN_TMP)
     {
-      Serial.println("DD4");
       if ((int)t_inn < 0)
       {
         display.setTextSize(2);
@@ -430,15 +424,6 @@ void DisplayData(enDisplayMode toDisplayMode)
       display.setTextColor(WHITE);
       display.setCursor(15, 18);
       display.println(abs((int)t_inn));
-
-      //Serial.print("t_set_on ");
-      //Serial.println(t_set_on);
-      Serial.print("t_set ");
-      Serial.println(t_set);
-      Serial.print("t_set2 ");
-      _delay_ms(10);
-      Serial.println(set_temp[t_set - 1]);
-
 
       if (t_set_on)
       {
@@ -470,24 +455,26 @@ void DisplayData(enDisplayMode toDisplayMode)
       display.setTextSize(4);
       byte i = 1;
       display.drawRect(i, i, display.width() - 2 * i, display.height() - 2 * i, WHITE);
+      byte lngth = CalculateIntSymbolsLength();
+      Serial.print("lngth= ");
+      Serial.println(lngth);
+      byte startX = CalculateStartX(lngth);
+      Serial.print("startX= ");
+      Serial.println(startX);
       if (t_out < 0)
       {
-        display.setCursor(10, 30);
+        display.setCursor(startX, 30);
         display.setTextSize(2);
         display.println("-");
       }
       display.setTextSize(4);
-      display.setCursor(25, 20);
+      display.setCursor(CalculateIntX(startX), 20);
       display.println(abs(t_outInt));
       display.setTextSize(3);
-      display.setCursor(80, 28);
-      display.println(".");
-      display.setCursor(95, 28);
-      display.println(abs(t_outDec));
-
-      //      char buf[15];
-      //      dtostrf(t_out, -10, 1, buf); //"-" omits leading blanks
-      //      display.println(buf);  //prints 26.5
+      display.setCursor(CalculateDecX(startX, lngth), 28);
+      char text[2];
+      sprintf(text, ".%d", abs(t_outDec));
+      display.println(text);
     }
     else if (displayMode == DISPLAY_ALARM)
     {
@@ -502,6 +489,54 @@ void DisplayData(enDisplayMode toDisplayMode)
     delay(200);
   }
 }
+
+byte CalculateStartX(byte lngth)
+{
+  switch (lngth) {
+    case 1:
+      return 50;
+    case 2:
+      return 45;
+    case 3:
+      return 30;
+    case 4:
+      return 20;
+    case 5:
+      return 12;
+  }
+}
+
+byte CalculateIntX(byte startX)
+{
+  return startX + (t_outSign == '-' ? 15 : 0);
+}
+
+byte CalculateDecX(byte startX, byte lngth)
+{
+  return CalculateIntX(startX) + (t_outSign == '-' ? lngth - 1 : lngth) * 13 ;
+}
+
+byte CalculateIntSymbolsLength()
+{
+  byte rslt = 0;
+  char text[3] = "   ";
+  if (t_outSign == '-')
+    sprintf(text, "-%d", t_outInt);
+  else
+    sprintf(text, "%d", t_outInt);
+
+  Serial.print("text= ");
+  Serial.println(text);
+  for (int i = 0; i < 3; i++)
+  {
+    if (text[i] == '-' || text[i] == '1')
+      rslt += 1;
+    else if (text[i] == '2' || text[i] == '3' || text[i] == '4' || text[i] == '5' || text[i] == '6' || text[i] == '7' || text[i] == '8' || text[i] == '9' || text[i] == '0')
+      rslt += 2;
+  }
+  return rslt;
+}
+
 
 void loop()
 {
