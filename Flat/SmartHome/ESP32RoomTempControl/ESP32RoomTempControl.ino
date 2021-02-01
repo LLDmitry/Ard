@@ -1,5 +1,3 @@
-#include <Adafruit_ssd1306syp.h>
-
 //Для управления (с дисплеем и кнопками) температурой в каждой комнате и связи с CentralControl.
 //Также передает сигнал тревоги в CentralControl. Для некоторых комнат включает сигнал тревоги
 //попеременно показывает iInn+tSet и tOut
@@ -18,7 +16,7 @@
 #include <Wire.h>
 //#include <Adafruit_GFX.h>
 //#include <Adafruit_SSD1306.h>
-
+#include <Adafruit_ssd1306syp.h>
 #include <SPI.h>
 
 #define BTN_P_PIN       3
@@ -432,8 +430,8 @@ void DisplayData(enDisplayMode toDisplayMode)
       byte startX = CalculateStartX(lngth, true);
       if (t_inn < 0)
       {
-        display.setTextSize(2);
-        display.setCursor(1, 30);
+        display.setTextSize(1);
+        display.setCursor(startX, 30);
         display.println("-");
       }
 
@@ -515,16 +513,22 @@ void DisplayData(enDisplayMode toDisplayMode)
 byte CalculateStartX(byte lngth, bool isInnerTemp)
 {
   switch (lngth) {
-    case 1:
-      return isInnerTemp ? 26 : 48;
-    case 2:
-      return isInnerTemp ? 21 : 42;
-    case 3:
-      return isInnerTemp ? 15 : 28;
-    case 4:
-      return isInnerTemp ? 9 : 18;
     case 5:
-      return isInnerTemp ? 2 : 10;
+      return isInnerTemp ? 24 : 40;
+    case 6:
+      return isInnerTemp ? 22 : 38;
+    case 7:
+      return isInnerTemp ? 15 : 30;
+    case 8:
+      return isInnerTemp ? 10 : 22;
+    case 10:
+      return isInnerTemp ? 7 : 14;
+    case 11:
+      return isInnerTemp ? 5 : 12;
+    case 12:
+      return isInnerTemp ? 3 : 10;
+    case 13:
+      return isInnerTemp ? 1 : 8;
   }
 }
 
@@ -535,7 +539,7 @@ byte CalculateIntX(byte startX, char sign)
 
 byte CalculateDecX(byte startX, byte lngth, char sign)
 {
-  return CalculateIntX(startX, sign) + (sign == '-' ? lngth - 1 : lngth) * 13 ;
+  return CalculateIntX(startX, sign) + (sign == '-' ? lngth - 1 : lngth) * 4 ;
 }
 
 byte CalculateIntSymbolsLength(byte tInt, char tSign)
@@ -551,14 +555,15 @@ byte CalculateIntSymbolsLength(byte tInt, char tSign)
   Serial.println(text);
   for (int i = 0; i < 3; i++)
   {
-    if (text[i] == '-' || text[i] == '1')
-      rslt += 1;
+    if (text[i] == '-' )
+      rslt = rslt + 2;
+    if (text[i] == '1')
+      rslt = rslt + 5;
     else if (text[i] == '2' || text[i] == '3' || text[i] == '4' || text[i] == '5' || text[i] == '6' || text[i] == '7' || text[i] == '8' || text[i] == '9' || text[i] == '0')
-      rslt += 2;
+      rslt = rslt + 6;
   }
   return rslt;
 }
-
 
 void loop()
 {
