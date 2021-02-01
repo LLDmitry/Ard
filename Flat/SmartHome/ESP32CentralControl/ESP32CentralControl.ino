@@ -418,16 +418,17 @@ void ReadCommandNRF() //from reponse
   {
     bool done = false;
     Serial.println("radio.available!!");
-    //while (!done)
-    //{
     radio.read(&nrfResponse, sizeof(nrfResponse));
     delay(20);
     radio.flush_rx();
-    //radio.stopListening();
     Serial.print("received data from room: ");
     Serial.println(nrfResponse.roomNumber);
-    //}
-    ParseAndHandleInputNrfCommand();
+    Serial.print("received Command: ");
+    Serial.println(nrfResponse.Command);
+    if (nrfResponse.Command != RSP_NO)
+    {
+      ParseAndHandleInputNrfCommand();
+    }
   }
 }
 

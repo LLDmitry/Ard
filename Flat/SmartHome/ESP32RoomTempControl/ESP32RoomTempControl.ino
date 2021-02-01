@@ -13,6 +13,7 @@
 #include <RF24.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <math.h>
 
 #include <Wire.h>
 //#include <Adafruit_GFX.h>
@@ -20,22 +21,22 @@
 
 #include <SPI.h>
 
-#define BTN_P_PIN     3
-#define BTN_M_PIN     4
-#define HEATER_PIN    8
-#define BUZZ_PIN      9
-#define PIR_SENSOR_PIN     2
-#define ONE_WIRE_PIN  5    // DS18b20
+#define BTN_P_PIN       3
+#define BTN_M_PIN       4
+#define HEATER_PIN      8
+#define BUZZ_PIN        9
+#define PIR_SENSOR_PIN  2
+#define ONE_WIRE_PIN    5    // DS18b20
 
 //RNF
-#define RNF_CE_PIN    6
-#define RNF_CSN_PIN   7
-#define RNF_MOSI      11
-#define RNF_MISO      12
-#define RNF_SCK       13
+#define RNF_CE_PIN      6
+#define RNF_CSN_PIN     7
+#define RNF_MOSI        11
+#define RNF_MISO        12
+#define RNF_SCK         13
 
-#define SDA_PIN           A4  //(SDA) I2C
-#define SCL_PIN           A5  //(SCK) I2C
+#define SDA_PIN         A4  //(SDA) I2C
+#define SCL_PIN         A5  //(SCK) I2C
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -77,11 +78,14 @@ elapsedMillis displayMode_ms = 0;
 bool alarmSensor = false;
 float t_inn = 0.0f;
 float t_out = 0.0f;
+float t_outThisRoom = 0.0f;
 byte t_outInt = 0;
 byte t_outSign = '+';
 byte t_outDec = 0;
 boolean heaterStatus = false;
-volatile boolean isAlarm = false;
+boolean isAlarmFromCenter = false;
+byte alarmMaxStatusFromCenter = 0;
+byte alarmMaxStatusRoomFromCenter = 0;
 enum enDisplayMode { DISPLAY_AUTO, DISPLAY_INN_TMP, DISPLAY_OUT_TMP, DISPLAY_ALARM };
 enDisplayMode displayMode = DISPLAY_OUT_TMP;
 
@@ -159,11 +163,21 @@ void PrepareCommandNRF()
   nrfResponse.Command = RSP_INFO;
   nrfResponse.roomNumber = ROOM_NUMBER;
   nrfResponse.alarmType = alarmSensor ? ALR_MOTION : ALR_NO;
-  nrfResponse.tInn = t_inn;
-  nrfResponse.tOut = t_out;
-  nrfResponse.co2 = random(100);
-  //nrfResponse.t1 = t_hot;
-  //nrfResponse.h = h_v;
+  nrfResponse.tInnSet = t_set;
+
+  float cc1;
+  nrfResponse.tInnDec = modff(t_inn, &cc1);
+  nrfResponse.tInn = (int)cc1;
+  nrfResponse.tInnSign = t_inn < 0 ? '-' : '+';
+
+  // если подключен внешний датчик
+  nrfResponse.tOutDec = modff(t_outThisRoom, &cc1);
+  nrfResponse.tOut = (int)cc1;
+  nrfResponse.tOutSign = t_outThisRoom < 0 ? '-' : '+';
+
+  nrfResponse.co2 = random(200); // если подключен датчик
+  //nrfResponse.addParam1 = t_hot; // если подключен датчик
+  //nrfResponse.h= h_v;  // если подключен датчик
 
   uint8_t f = radio.flush_tx();
   radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
@@ -176,8 +190,8 @@ void RefreshSensorData()
     Serial.println("RefreshSensorData");
     //    sensors.requestTemperatures();
     //    t_inn = sensors.getTempC(InnTempDeviceAddress);
-    t_inn = 15.6; //debug
-    //    t_out = sensors.getTempC(OutTempDeviceAddress);
+    t_inn = (float)random(300) / 10.0; //debug
+    //    t_outThisRoom = sensors.getTempC(OutTempDeviceAddress);
     //    //t_hot = sensors.getTempC(HotVodaTempDeviceAddress);
     //
 
@@ -191,14 +205,15 @@ void CheckAlarmSensor()
 {
   if (checkAlarmSensor_ms > CHECK_ALARM_SENSOR_PERIOD_S * 1000)
   {
-    alarmSensor = true;
+    if (digitalRead(PIR_SENSOR_PIN))
+      alarmSensor = true; //reset only after succesful send response.Alarm (чтобы не сбросить тревогу до отправки в CentralControl)
     checkAlarmSensor_ms = 0;
   }
 }
 
 void AlarmSignal()
 {
-  digitalWrite(BUZZ_PIN, isAlarm);
+  digitalWrite(BUZZ_PIN, isAlarmFromCenter);
 }
 
 //Get Command
@@ -215,51 +230,47 @@ void ReadCommandNRF()
       Serial.println("radio.available!!");
       radio.read(&nrfRequest, sizeof(nrfRequest));
       delay(20);
-      radio.flush_rx();
-      _delay_ms(20);
       Serial.println("radio.read: ");
       Serial.println(nrfRequest.roomNumber);
-      Serial.println(600 + nrfRequest.p);
-      Serial.println(nrfRequest.Command);
-      Serial.println(nrfRequest.minutes);
-      Serial.println(nrfRequest.tOut);
-      Serial.println(nrfRequest.tInnSet);
-      _delay_ms(20);
-
       HandleInputNrfCommand();
-
-
-      nrfResponse.Command == RSP_NO;
-      //      nrfResponse.tOut = 99.9;
-      nrfResponse.tInn = t_inn;
-      nrfResponse.tInnSet = t_set;
-      //nrfResponse.alarmSensor = alarmSensor;
-      //}
+      doAfterRead();
     }
     readCommandNRF_ms = 0;
   }
 }
 
+void doAfterRead()
+{
+  radio.flush_rx();
+  t_set = 100;
+  if (alarmSensor)
+    alarmSensor = false;
+}
+
 void HandleInputNrfCommand()
 {
-  Serial.print("                           roomNumber= ");
-  Serial.println(nrfRequest.roomNumber);
-  if (nrfRequest.roomNumber == ROOM_NUMBER)
+  if (nrfRequest.roomNumber == ROOM_NUMBER) //вообще-то проверка не нужна - из-за разных каналов должно придти только этой Room
   {
-    //Serial.print("tSet= ");
-    //Serial.println(nrfRequest.tSet);
-    //t_outSign = nrfRequest.tOutSign;
-    t_outSign = '-';
+    Serial.println(600 + nrfRequest.p);
+    Serial.println(nrfRequest.Command);
+    Serial.println(nrfRequest.minutes);
+    Serial.println(nrfRequest.tOut);
+    Serial.println(nrfRequest.tInnSet);
+
+    t_outSign = nrfRequest.tOutSign;
+    t_outSign = '-';  //d
     t_outInt = nrfRequest.tOut;
     t_outDec = nrfRequest.tOutDec;
-    t_out = t_outInt + ((float)nrfRequest.tOutDec / 10.0f);
-    //d if (nrfRequest.tOutSign == '-')
-    t_out = -t_out;
+    t_out = t_outInt + ((float)t_outDec / 10.0f);
+    if (t_outSign == '-')
+      t_out = -t_out;
+
     if (nrfRequest.tInnSet < 100)
     {
       t_set = nrfRequest.tInnSet;
       t_set_on = t_set > 0;
       SaveTSetEEPROM();
+      HeaterControl();
     }
     Serial.print("t_out= ");
     Serial.println(t_out);
@@ -282,9 +293,12 @@ void HandleInputNrfCommand()
         set_temp[4] = nrfRequest.tInnSetVal5;
 
       SaveTSetsEEPROM();
+      HeaterControl();
     }
-    HeaterControl();
-    //isAlarm = nrfRequest.isAlarm; //central send it to one room
+
+    isAlarmFromCenter = nrfRequest.alarmMaxStatus > 0; //central send it to one room
+    alarmMaxStatusFromCenter = nrfRequest.alarmMaxStatus;
+    alarmMaxStatusRoomFromCenter = nrfRequest.alarmMaxStatusRoom;
   }
 }
 
@@ -357,6 +371,7 @@ void ChangeSetTemp(int sign)
 
   SaveTSetEEPROM();
   HeaterControl();
+  PrepareCommandNRF();
 }
 
 void CheckButtons()
@@ -413,17 +428,24 @@ void DisplayData(enDisplayMode toDisplayMode)
 
     if (displayMode == DISPLAY_INN_TMP)
     {
-      if ((int)t_inn < 0)
+      byte lngth = CalculateIntSymbolsLength((int)t_inn, t_inn < 0 ? '-' : '+');
+      byte startX = CalculateStartX(lngth, true);
+      if (t_inn < 0)
       {
         display.setTextSize(2);
         display.setCursor(1, 30);
         display.println("-");
       }
 
-      display.setTextSize(5);
+      display.setTextSize(4);
       display.setTextColor(WHITE);
-      display.setCursor(15, 18);
-      display.println(abs((int)t_inn));
+
+      display.setCursor(CalculateIntX(startX, t_inn < 0 ? '-' : '+'), 20);
+      display.print(abs((int)t_inn));
+      display.setCursor(CalculateDecX(startX, lngth, t_inn < 0 ? '-' : '+'), 35);
+      display.setTextSize(2);
+      display.print(".");
+      display.println(abs((int)((t_inn - (int)t_inn) * 10)));
 
       if (t_set_on)
       {
@@ -444,7 +466,7 @@ void DisplayData(enDisplayMode toDisplayMode)
       }
       else
       {
-        display.setCursor(100, 20);
+        display.setCursor(90, 35);
         display.println("OFF");
       }
     }
@@ -455,23 +477,23 @@ void DisplayData(enDisplayMode toDisplayMode)
       display.setTextSize(4);
       byte i = 1;
       display.drawRect(i, i, display.width() - 2 * i, display.height() - 2 * i, WHITE);
-      byte lngth = CalculateIntSymbolsLength();
+      byte lngth = CalculateIntSymbolsLength(t_outInt, t_outSign);
       Serial.print("lngth= ");
       Serial.println(lngth);
-      byte startX = CalculateStartX(lngth);
+      byte startX = CalculateStartX(lngth, false);
       Serial.print("startX= ");
       Serial.println(startX);
-      if (t_out < 0)
+      if (t_outSign == '-')
       {
         display.setCursor(startX, 30);
         display.setTextSize(2);
         display.println("-");
       }
       display.setTextSize(4);
-      display.setCursor(CalculateIntX(startX), 20);
+      display.setCursor(CalculateIntX(startX, t_outSign), 20);
       display.println(abs(t_outInt));
       display.setTextSize(3);
-      display.setCursor(CalculateDecX(startX, lngth), 28);
+      display.setCursor(CalculateDecX(startX, lngth, t_outSign), 28);
       char text[2];
       sprintf(text, ".%d", abs(t_outDec));
       display.println(text);
@@ -490,40 +512,40 @@ void DisplayData(enDisplayMode toDisplayMode)
   }
 }
 
-byte CalculateStartX(byte lngth)
+byte CalculateStartX(byte lngth, bool isInnerTemp)
 {
   switch (lngth) {
     case 1:
-      return 50;
+      return isInnerTemp ? 26 : 48;
     case 2:
-      return 45;
+      return isInnerTemp ? 21 : 42;
     case 3:
-      return 30;
+      return isInnerTemp ? 15 : 28;
     case 4:
-      return 20;
+      return isInnerTemp ? 9 : 18;
     case 5:
-      return 12;
+      return isInnerTemp ? 2 : 10;
   }
 }
 
-byte CalculateIntX(byte startX)
+byte CalculateIntX(byte startX, char sign)
 {
-  return startX + (t_outSign == '-' ? 15 : 0);
+  return startX + (sign == '-' ? 15 : 0);
 }
 
-byte CalculateDecX(byte startX, byte lngth)
+byte CalculateDecX(byte startX, byte lngth, char sign)
 {
-  return CalculateIntX(startX) + (t_outSign == '-' ? lngth - 1 : lngth) * 13 ;
+  return CalculateIntX(startX, sign) + (sign == '-' ? lngth - 1 : lngth) * 13 ;
 }
 
-byte CalculateIntSymbolsLength()
+byte CalculateIntSymbolsLength(byte tInt, char tSign)
 {
   byte rslt = 0;
   char text[3] = "   ";
-  if (t_outSign == '-')
-    sprintf(text, "-%d", t_outInt);
+  if (tSign == '-')
+    sprintf(text, "-%d", tInt);
   else
-    sprintf(text, "%d", t_outInt);
+    sprintf(text, "%d", tInt);
 
   Serial.print("text= ");
   Serial.println(text);
