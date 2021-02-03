@@ -294,9 +294,13 @@ void HandleInputNrfCommand()
       HeaterControl();
     }
 
-    isAlarmFromCenter = nrfRequest.alarmMaxStatus > 0; //central send it to one room
-    alarmMaxStatusFromCenter = nrfRequest.alarmMaxStatus;
-    alarmMaxStatusRoomFromCenter = nrfRequest.alarmMaxStatusRoom;
+    if (nrfRequest.alarmMaxStatus > 0) //central send it to this room
+    {
+      isAlarmFromCenter = true;  //reset only by button
+      alarmMaxStatusFromCenter = nrfRequest.alarmMaxStatus;
+      alarmMaxStatusRoomFromCenter = nrfRequest.alarmMaxStatusRoom;
+      DisplayData(DISPLAY_ALARM);
+    }
   }
 }
 
@@ -348,6 +352,14 @@ void HeaterControl()
 
 void ChangeSetTemp(int sign)
 {
+
+  if (isAlarmFromCenter)  //reset alarm info by any button
+  {
+    isAlarmFromCenter = false;
+    alarmMaxStatusFromCenter = 0;
+    alarmMaxStatusRoomFromCenter = 0;
+  }
+
   if (sign == 1)
   {
     t_set_on = true;
@@ -398,7 +410,10 @@ void CheckButtons()
 
 void DisplayData(enDisplayMode toDisplayMode)
 {
-  if (toDisplayMode != DISPLAY_AUTO || displayMode == DISPLAY_INN_TMP && displayMode_ms > SHOW_TMP_INN_S * 1000 || (displayMode == DISPLAY_OUT_TMP || displayMode == DISPLAY_ALARM) && displayMode_ms > SHOW_TMP_OUT_S * 1000)
+  if (isAlarmFromCenter)
+    toDisplayMode = DISPLAY_ALARM;
+
+  if (toDisplayMode != DISPLAY_AUTO || displayMode == DISPLAY_INN_TMP && displayMode_ms > SHOW_TMP_INN_S * 1000 || displayMode == DISPLAY_OUT_TMP && displayMode_ms > SHOW_TMP_OUT_S * 1000)
   {
     if (toDisplayMode == DISPLAY_AUTO)
     {
@@ -409,15 +424,13 @@ void DisplayData(enDisplayMode toDisplayMode)
     }
     else
     {
-      if (toDisplayMode = DISPLAY_ALARM)
-      {
-      }
-      else if (toDisplayMode = DISPLAY_INN_TMP)
+      if (toDisplayMode = DISPLAY_INN_TMP)
       {
         displayMode = DISPLAY_INN_TMP;
       }
     }
-    displayMode_ms = 0;
+    if (toDisplayMode == DISPLAY_AUTO)
+      displayMode_ms = 0;
 
     //display.setFont(&FreeSerif9pt7b);
     display.clear();
@@ -498,12 +511,13 @@ void DisplayData(enDisplayMode toDisplayMode)
     }
     else if (displayMode == DISPLAY_ALARM)
     {
+      display.setTextSize(3);
       display.setCursor(100, 10);
       display.println("ALARM");
-      //display.setCursor(100, 30);
-      //display.println(alarmMaxStatus);
-      //display.setCursor(100, 60);
-      //display.println(alarmMaxStatusRoom);
+      display.setCursor(100, 25);
+      display.println(alarmMaxStatusFromCenter);
+      display.setCursor(100, 50);
+      display.println(alarmMaxStatusRoomFromCenter);
     }
     display.update();
     delay(200);
