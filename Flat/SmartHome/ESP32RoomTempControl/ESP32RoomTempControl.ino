@@ -188,7 +188,7 @@ void RefreshSensorData()
     Serial.println("RefreshSensorData");
     //    sensors.requestTemperatures();
     //    t_inn = sensors.getTempC(InnTempDeviceAddress);
-    t_inn = (float)random(300) / 10.0; //debug
+    t_inn = (float)random(150) / 10.0; //debug
     //    t_outThisRoom = sensors.getTempC(OutTempDeviceAddress);
     //    //t_hot = sensors.getTempC(HotVodaTempDeviceAddress);
     //
@@ -220,15 +220,13 @@ void ReadCommandNRF()
   _delay_ms(10);
   if (readCommandNRF_ms > READ_COMMAND_NRF_INTERVAL_S * 1000)
   {
-    Serial.println("ReadCommandNRF_START");
     _delay_ms(10);
     if (radio.available())
     {
       int cntAvl = 0;
-      Serial.println("radio.available!!");
       radio.read(&nrfRequest, sizeof(nrfRequest));
       delay(20);
-      Serial.println("radio.read: ");
+      Serial.print("radio.read: ");
       Serial.println(nrfRequest.roomNumber);
       HandleInputNrfCommand();
       doAfterRead();
@@ -240,7 +238,6 @@ void ReadCommandNRF()
 void doAfterRead()
 {
   radio.flush_rx();
-  t_set = 100;
   if (alarmSensor)
     alarmSensor = false;
 }
@@ -249,11 +246,11 @@ void HandleInputNrfCommand()
 {
   if (nrfRequest.roomNumber == ROOM_NUMBER) //вообще-то проверка не нужна - из-за разных каналов должно придти только этой Room
   {
-    Serial.println(600 + nrfRequest.p);
-    Serial.println(nrfRequest.Command);
-    Serial.println(nrfRequest.minutes);
-    Serial.println(nrfRequest.tOut);
-    Serial.println(nrfRequest.tInnSet);
+    //    Serial.println(600 + nrfRequest.p);
+    //    Serial.println(nrfRequest.Command);
+    //    Serial.println(nrfRequest.minutes);
+    //    Serial.println(nrfRequest.tOut);
+    //    Serial.println(nrfRequest.tInnSet);
 
     t_outSign = nrfRequest.tOutSign;
     t_outSign = '-';  //d
@@ -263,21 +260,25 @@ void HandleInputNrfCommand()
     if (t_outSign == '-')
       t_out = -t_out;
 
-    if (nrfRequest.tInnSet < 100)
+    if (nrfRequest.tInnSet < 100 && t_set != nrfRequest.tInnSet)
     {
       t_set = nrfRequest.tInnSet;
       t_set_on = t_set > 0;
       SaveTSetEEPROM();
       HeaterControl();
     }
-    Serial.print("t_out= ");
-    Serial.println(t_out);
-    Serial.print("t_set= ");
-    Serial.println(t_set);
-    Serial.print("tInnSetVal1= ");
-    Serial.println(nrfRequest.tInnSetVal1);
+    //    Serial.print("t_out= ");
+    //    Serial.println(t_out);
+    //    Serial.print("t_set= ");
+    //    Serial.println(t_set);
+    //    Serial.print("tInnSetVal1= ");
+    //    Serial.println(nrfRequest.tInnSetVal1);
 
-    if (nrfRequest.tInnSetVal1 <= 30 || nrfRequest.tInnSetVal2 <= 30 || nrfRequest.tInnSetVal3 <= 30 || nrfRequest.tInnSetVal4 <= 30 || nrfRequest.tInnSetVal5 <= 30)
+    if (nrfRequest.tInnSetVal1 <= 30 && set_temp[0] != nrfRequest.tInnSetVal1 ||
+        nrfRequest.tInnSetVal2 <= 30 && set_temp[1] != nrfRequest.tInnSetVal2 ||
+        nrfRequest.tInnSetVal3 <= 30 && set_temp[2] != nrfRequest.tInnSetVal3 ||
+        nrfRequest.tInnSetVal4 <= 30 && set_temp[3] != nrfRequest.tInnSetVal4 ||
+        nrfRequest.tInnSetVal5 <= 30 && set_temp[4] != nrfRequest.tInnSetVal5)
     {
       if (nrfRequest.tInnSetVal1 <= 30)
         set_temp[0] = nrfRequest.tInnSetVal1;
@@ -453,11 +454,12 @@ void DisplayData(enDisplayMode toDisplayMode)
 
       display.setCursor(CalculateIntX(startX, t_inn < 0 ? '-' : '+'), 20);
       display.print(abs((int)t_inn));
-      display.setCursor(CalculateDecX(startX, lngth, t_inn < 0 ? '-' : '+'), 35);
+      display.setCursor(CalculateDecX(startX, lngth, t_inn < 0 ? '-' : '+'), 33);
       display.setTextSize(2);
       display.print(".");
       display.println(abs((int)((t_inn - (int)t_inn) * 10)));
 
+      //display set temp
       if (t_set_on)
       {
         byte x, y;
@@ -466,12 +468,12 @@ void DisplayData(enDisplayMode toDisplayMode)
         else
           x = 88;
         display.setTextSize(3);
-        if ((int)t_inn < (int)set_temp[t_set - 1])
-          y = 8;
-        else if ((int)t_inn > (int)set_temp[t_set - 1])
+        if (t_inn < (float)set_temp[t_set - 1] - 0.5)
+          y = 6;
+        else if (t_inn > (float)set_temp[t_set - 1] + 0.5)
           y = 42;
         else
-          y = 20;
+          y = 22;
         display.setCursor(x, y);
         display.println((int)set_temp[t_set - 1]);
       }
@@ -483,7 +485,6 @@ void DisplayData(enDisplayMode toDisplayMode)
     }
     else if (displayMode == DISPLAY_OUT_TMP)
     {
-      Serial.println("DD5");
       //внешняя температура - внутри рамки
       display.setTextSize(4);
       byte i = 1;
@@ -498,16 +499,15 @@ void DisplayData(enDisplayMode toDisplayMode)
       {
         display.setCursor(startX, 30);
         display.setTextSize(2);
-        display.println("-");
+        display.print("-");
       }
       display.setTextSize(4);
       display.setCursor(CalculateIntX(startX, t_outSign), 20);
-      display.println(abs(t_outInt));
+      display.print(abs(t_outInt));
       display.setTextSize(3);
-      display.setCursor(CalculateDecX(startX, lngth, t_outSign), 28);
-      char text[2];
-      sprintf(text, ".%d", abs(t_outDec));
-      display.println(text);
+      display.setCursor(CalculateDecX(startX, lngth, t_outSign), 26);
+      display.print(".");
+      display.println(t_outDec);
     }
     else if (displayMode == DISPLAY_ALARM)
     {
@@ -536,13 +536,15 @@ byte CalculateStartX(byte lngth, bool isInnerTemp)
     case 8:
       return isInnerTemp ? 10 : 22;
     case 10:
-      return isInnerTemp ? 7 : 14;
+      return isInnerTemp ? 7 : 18;
     case 11:
-      return isInnerTemp ? 5 : 12;
+      return isInnerTemp ? 5 : 16;
     case 12:
-      return isInnerTemp ? 3 : 10;
+      return isInnerTemp ? 3 : 14;
     case 13:
-      return isInnerTemp ? 1 : 8;
+      return isInnerTemp ? 2 : 12;
+    case 14:
+      return isInnerTemp ? 1 : 10;
   }
 }
 

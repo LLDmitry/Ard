@@ -126,7 +126,7 @@ float vent_set[10];      //желаемая вентиляция по комна
 boolean nagrevStatus[10];//состояние батарей по комнатам (true/false)
 EnModeVent modeVent[10]; //вентиляция по комнатам
 byte alarmStatus[10];    //alarm, по комнатам  //0-none, 1-medium, 2-serious
-byte alarmStatusNotification[10][2];    //alarm, раздать по комнатам:  статус//0-none, 1-medium, 2-serious + номера комнат
+byte alarmStatusNotification[10][2];    //alarm, раздать по комнатам: [10] номер комнаты куда послать; [10][0] статус//0-none, 1-medium, 2-serious; [10][1] AlarmFromRoom
 //номера комнат подписчиков и поставщиков Alert bitRead(a, 0)
 byte arRoomsAlarmNotification[5] = {
   0b00111010,
@@ -186,7 +186,7 @@ const byte ROOMS_NUMBER = 10;
 const byte EEPROM_SIZE = 1;
 
 int powerHeaters[ROOMS_NUMBER] = {800, 2000, 2000, 500, 800, 1000, 1000};
-byte sets_temp[ROOMS_NUMBER][5] = {
+byte setsTemp[ROOMS_NUMBER][5] = {
   {2, 15, 20, 23, 25},
   {2, 15, 20, 23, 25},
   {2, 15, 20, 23, 25},
@@ -195,14 +195,16 @@ byte sets_temp[ROOMS_NUMBER][5] = {
   {2, 12, 20, 23, 25},
   {2, 10, 15, 18, 21},
 };
-enum homeMode_enum {GUARD_MODE, HOME_MODE, NIGHT_MODE, GUESTS_MODE, STOP_MODE};
-byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] sets_temp[room][i]; 0-выключить, 100-не менять
+
+byte defaultTemp[5][ROOMS_NUMBER] = { //[дома/ушел/ночь][к1 к2 к3 к4 к5] setsTemp[room][i]; 0-выключить, 100-не менять
   {1, 0, 1, 0, 0, 0, 0},        //ушел
   {2, 3, 4, 3, 1, 1, 1},        //дома
   {1, 2, 1, 2, 100, 100, 100},  //ночь
   {1, 0, 3, 3, 4, 4, 4},        //гости
   {1, 0, 0, 0, 0, 0, 0},        //стоп
 };
+
+enum homeMode_enum {GUARD_MODE, HOME_MODE, NIGHT_MODE, GUESTS_MODE, STOP_MODE, SET_ROOM_TEMP_MODE, NONE_MODE};
 homeMode_enum homeMode;
 homeMode_enum homeModeBeforeNight;
 
@@ -261,19 +263,38 @@ void IRAM_ATTR detectsMotion() {
 
 void backupDefaultTemp()
 {
-
-  Serial.println("backupDefaultTemp");
+  Serial.println("backupDefaultTemp1Mode");
+  Serial.println("backupDefaultTempAllModes");
   for (int s = 0; s < 5; s++) {
-    for (int r = 0; r < ROOMS_NUMBER; r++) {
-      char a[3];
-      ((String)s + (String)r).toCharArray(a, 3);
-      Serial.print(a);
-      Serial.print(": ");
-      Serial.println(defaultTemp[s][r]);
-      prefs.putUInt(a, defaultTemp[s][r]);
-    }
+    backupDefaultTempOneMode(s);
   }
   //prefs.end();
+}
+
+void backupDefaultTempOneMode(int setHomeMode)
+{
+  for (int r = 0; r < ROOMS_NUMBER; r++) {
+    char a[4];
+    ("d" + (String)setHomeMode + (String)r).toCharArray(a, 4);
+    Serial.print(a);
+    Serial.print(": ");
+    Serial.println(defaultTemp[setHomeMode][r]);
+    prefs.putUInt(a, defaultTemp[setHomeMode][r]);
+  }
+}
+
+void backupSetsTempOneRoom(byte room)
+{
+  Serial.print("    backupSetsTempOneRoom:");
+  Serial.println(room);
+  for (int s = 0; s < 5; s++) {
+    char a[4];
+    ("s" + (String)s + (String)room).toCharArray(a, 4);
+    Serial.print(a);
+    Serial.print(": ");
+    Serial.println(setsTemp[room][s]);
+    prefs.putUInt(a, setsTemp[room][s]);
+  }
 }
 
 void restoreDefaultTemp()
@@ -281,12 +302,28 @@ void restoreDefaultTemp()
   Serial.println("restoreDefaultTemp");
   for (int s = 0; s < 5; s++) {
     for (int r = 0; r < ROOMS_NUMBER; r++) {
-      char a[3];
-      ((String)s + (String)r).toCharArray(a, 3);
+      char a[4];
+      ("d" + (String)s + (String)r).toCharArray(a, 4);
       //      Serial.print(a);
       //      Serial.print(": ");
       defaultTemp[s][r] = prefs.getUInt(a, 0);
       //      Serial.println(defaultTemp[s][r]);
+    }
+  }
+  //prefs.end();
+}
+
+void restoreSetsTemp()
+{
+  Serial.println("restoreSetsTemp");
+  for (int s = 0; s < 5; s++) {
+    for (int r = 0; r < ROOMS_NUMBER; r++) {
+      char a[4];
+      ("s" + (String)s + (String)r).toCharArray(a, 4);
+      //      Serial.print(a);
+      //      Serial.print(": ");
+      setsTemp[r][s] = prefs.getUInt(a, 0);
+      //      Serial.println(setsTemp[r][s]);
     }
   }
   //prefs.end();
@@ -315,6 +352,9 @@ void restoreSettings()
   timeStopNightSec = prefs.getUInt("nsp", 0);
   Serial.print("  timeStartNightSec ");
   Serial.println(timeStartNightSec);
+
+  restoreDefaultTemp();
+  restoreSetsTemp();
 }
 
 void setup()
@@ -359,10 +399,8 @@ void setup()
   //eeprom analog
   prefs.begin("nvs", false);
   //backupDefaultTemp(); //1st time, comment after
-  restoreDefaultTemp();
+
   restoreSettings();
-
-
 
   pinMode(BZZ_PIN, OUTPUT);
   RadioSetup();
@@ -472,7 +510,7 @@ void FillAlarmStatuses()
       {
         if (bitRead(arRoomsAlarmNotification[iNotifRoom], iCheckRoom))
         {
-          if (alarmStatus[iCheckRoom] > alarmStatusNotification[iNotifRoom][0])
+          if (alarmStatus[iCheckRoom] > alarmStatusNotification[iNotifRoom][0]) //если в iCheckRoom более высокий приоритет Alarm чем был ранее
           {
             alarmStatusNotification[iNotifRoom][0] = alarmStatus[iCheckRoom];
             alarmStatusNotification[iNotifRoom][1] = iCheckRoom;
@@ -499,6 +537,13 @@ void PrepareRequestCommand(byte roomNumber)
   nrfRequest.tInnSet = t_set[roomNumber];
   Serial.print("nrfRequest.tInnSet= ");
   Serial.println(nrfRequest.tInnSet);
+
+  nrfRequest.tInnSetVal1 = setsTemp[roomNumber][0];
+  nrfRequest.tInnSetVal2 = setsTemp[roomNumber][1];
+  nrfRequest.tInnSetVal3 = setsTemp[roomNumber][2];
+  nrfRequest.tInnSetVal4 = setsTemp[roomNumber][3];
+  nrfRequest.tInnSetVal5 = setsTemp[roomNumber][4];
+
   //nrfRequest.nagrevStatus = nagrevStatus[roomNumber];
   if (roomNumber == ROOM_VENT)
     switch (modeVent[ROOM_BED])
@@ -997,19 +1042,19 @@ BLYNK_WRITE(VP_ROOM_SELECT)
 
 void displayCurrentRoomTemperatuteSet(byte prevCurrentRoom)
 {
-  if (sets_temp[prevCurrentRoom - 1][0] != sets_temp[currentRoom - 1][0] ||
-      sets_temp[prevCurrentRoom - 1][1] != sets_temp[currentRoom - 1][1] ||
-      sets_temp[prevCurrentRoom - 1][2] != sets_temp[currentRoom - 1][2] ||
-      sets_temp[prevCurrentRoom - 1][3] != sets_temp[currentRoom - 1][3] ||
-      sets_temp[prevCurrentRoom - 1][4] != sets_temp[currentRoom - 1][4]
+  if (setsTemp[prevCurrentRoom - 1][0] != setsTemp[currentRoom - 1][0] ||
+      setsTemp[prevCurrentRoom - 1][1] != setsTemp[currentRoom - 1][1] ||
+      setsTemp[prevCurrentRoom - 1][2] != setsTemp[currentRoom - 1][2] ||
+      setsTemp[prevCurrentRoom - 1][3] != setsTemp[currentRoom - 1][3] ||
+      setsTemp[prevCurrentRoom - 1][4] != setsTemp[currentRoom - 1][4]
      )
   {
     Blynk.setProperty(VP_ROOM_TMP_SET, "labels",
-                      sets_temp[currentRoom - 1][0],
-                      sets_temp[currentRoom - 1][1],
-                      sets_temp[currentRoom - 1][2],
-                      sets_temp[currentRoom - 1][3],
-                      sets_temp[currentRoom - 1][4]
+                      setsTemp[currentRoom - 1][0],
+                      setsTemp[currentRoom - 1][1],
+                      setsTemp[currentRoom - 1][2],
+                      setsTemp[currentRoom - 1][3],
+                      setsTemp[currentRoom - 1][4]
                      );
   }
 }
@@ -1174,7 +1219,7 @@ bool checkHeatSwitch(byte room)
   //    Serial.print("set_temp_room ");
   //    Serial.println(t_set[room - 1]);
   //  }
-  //return (heat_status_room[room - 1] == 1 && t_inn[room - 1] < sets_temp[room - 1][t_set[room - 1] - 1]); //включить нагрев
+  //return (heat_status_room[room - 1] == 1 && t_inn[room - 1] < setsTemp[room - 1][t_set[room - 1] - 1]); //включить нагрев
   return true;
 }
 
@@ -1288,6 +1333,9 @@ void refreshLocalTime()
 // уст ночь к1т9 к2т2 к5т21
 // уст дома к1т19 к2т2 к3т22 к5т21
 
+// к2 т3 т15 т22 т23 т24
+// уст к2 т3 т15 т22 т23 т24
+
 //инф
 //  ком
 //=> к1 гостинная
@@ -1305,6 +1353,8 @@ const String homeWord = "дома";
 const String guestsWord = "гости";
 const String nightWord = "ночь";
 
+const String roomWord = "к";
+
 void execTerminalCommands(String command)
 {
   Serial.print("defaultTemp prev");
@@ -1315,8 +1365,8 @@ void execTerminalCommands(String command)
   char *str;
 
   String typeComnand;
-  String keyWord;
   homeMode_enum keyCommand;
+  byte keyRoom;
 
   command.toCharArray(char_array, str_len);
   char *p = char_array;
@@ -1329,77 +1379,116 @@ void execTerminalCommands(String command)
     i++;
     Serial.println(str);
     if (i == 1)
+    {
       typeComnand = str;
+      typeComnand.toLowerCase();
+    }
     else
     {
       if (i == 2)
       {
         if (typeComnand == setWord)
         {
-          keyWord = str;
-          keyCommand = getKeyCommand(keyWord);
+          keyCommand = getKeyCommand(str);
+          if (keyCommand == SET_ROOM_TEMP_MODE)
+          {
+            keyRoom = getRoom(str); //для команд вида    уст к2 т3 т15 т22 т23 т24
+            Serial.print("keyRoom: ");
+            Serial.println(keyRoom);
+          }
         }
       }
       else
       {
-        Serial.print("keyCommand");
+        Serial.print("keyCommand: ");
         Serial.println(keyCommand);
-        Serial.print("getRoom(str)");
+        Serial.print("getRoom(str): ");
         Serial.println(getRoom(str));
-        Serial.print("getValue(str)");
+        Serial.print("getValue(str): ");
         Serial.println(getValue(str));
+        Serial.print("keyRoom: ");
+        Serial.println(keyRoom);
 
-        defaultTemp[keyCommand][getRoom(str)] = getValue(str);
-
-        //EEPROM.write(getRoom(str), getValue(str));
-        char a[3];
-        ((String)keyCommand + (String)getRoom(str)).toCharArray(a, 3);
-        prefs.putUInt(a, defaultTemp[keyCommand][getRoom(str)]);
-        if (keyCommand == homeMode)
+        if (keyCommand == SET_ROOM_TEMP_MODE) //настройка шкалы температуры в комнате
         {
-          changeHomeMode(homeMode, false); //чтобы стразу применилось если текущий mode = настраиваемуму
+          setsTemp[keyRoom][i - 3] = getValue(str);
+          //prefs.putUInt(a, defaultTemp[keyCommand][getRoom(str)]);
         }
-
+        else  // установка значений температуры для режима по комнатам
+        {
+          defaultTemp[keyCommand][getRoom(str)] = getValue(str);
+          if (keyCommand == homeMode)
+          {
+            changeHomeMode(homeMode, false); //чтобы стразу применилось если текущий mode = настраиваемому
+          }
+        }
       }
     }
   }
 
-  if (command.startsWith(setWord))
+  if (keyCommand == SET_ROOM_TEMP_MODE) //установка шкалы температуры в комнате
   {
-    if (command.startsWith(nightWord))
-    {
-
-    }
-    else if (command.startsWith(homeWord))
-    {
-
-    }
+    // backup шкалы температуры в настраиваемой комнате
+    backupSetsTempOneRoom(keyRoom);
   }
-  else if (command.startsWith(infWord))
-  {
+  else  // backup установленных значений температуры для настраиваемого режима по комнатам
+    backupDefaultTempOneMode(keyCommand);
 
-  }
+  //  if (command.startsWith(setWord))
+  //  {
+  //    if (command.startsWith(nightWord))
+  //    {
+  //
+  //    }
+  //    else if (command.startsWith(homeWord))
+  //    {
+  //
+  //    }
+  //  }
+  //  else if (command.startsWith(infWord))
+  //  {
+  //
+  //  }
   Serial.print("defaultTemp post");
   Serial.println(defaultTemp[2][1]);
 }
 
 homeMode_enum getKeyCommand(String key)
 {
-  if (key == waitWord) return GUARD_MODE;
-  if (key == stopWord) return STOP_MODE;
-  if (key == homeWord) return HOME_MODE;
-  if (key == guestsWord) return GUESTS_MODE;
-  if (key == nightWord) return NIGHT_MODE;
+  key.toLowerCase();
+  if (key.startsWith(waitWord)) return GUARD_MODE;
+  if (key.startsWith(stopWord)) return STOP_MODE;
+  if (key.startsWith(homeWord)) return HOME_MODE;
+  if (key.startsWith(guestsWord)) return GUESTS_MODE;
+  if (key.startsWith(nightWord)) return NIGHT_MODE;
+  if (key.startsWith(roomWord)) return SET_ROOM_TEMP_MODE;
 }
 
-byte getRoom(String key)
+byte getRoom(String key) //key=  к3  или к3т23
 {
-  return key.substring(2, 3).toInt() - 1;
+  //Serial.print("getRoom ");
+  //Serial.println(key.length());
+  //Serial.println(key);
+  int r = key.substring(2, 3).toInt() - 1;
+  //Serial.print("r: ");;
+  //Serial.println(r);
+  return r;
 }
 
 byte getValue(String key)
-{
-  return key.substring(5).toInt();
+{ 
+  key.toLowerCase();
+  Serial.print("getValue ");
+  Serial.println(key.length());
+  Serial.println(key);
+  byte val;
+  if (key.substring(3, 4) == "т")   //key = к3т19
+    val = key.substring(4).toInt();
+  else                              //key = т19
+    val = key.substring(2).toInt();
+  Serial.print("val= ");
+  Serial.println(val);
+  return val;
 }
 
 void getWeatherData() //client function to send/receive GET request data.
