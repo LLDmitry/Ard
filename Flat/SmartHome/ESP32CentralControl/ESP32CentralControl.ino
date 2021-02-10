@@ -525,12 +525,17 @@ void PrepareRequestCommand(byte roomNumber)
 {
   nrfRequest.Command = RQ_T_INFO;
   nrfRequest.roomNumber = roomNumber;
-  //nrfRequest.tOut = t_out;
-  nrfRequest.tOut = random(30);
-  nrfRequest.tOutDec = random(9);
-  Serial.print("roomNumber    ");
+
+  float cc1;
+  nrfRequest.tOutDec = modff(abs(t_out), &cc1) * 10;
+  nrfRequest.tOut = (int)cc1;
+  nrfRequest.tOutSign = t_out < 0 ? '-' : '+';
+
+  //nrfRequest.tOutDec = random(9);
+  Serial.print("roomNumber:");
   Serial.println(roomNumber);
   Serial.println(nrfRequest.tOut);
+  Serial.println(nrfRequest.tOutDec);
   Serial.println(p_v);
   nrfRequest.p = (int)((p_v - 6000) / 10);
   nrfRequest.pDec = (p_v - 6000) % 10;
@@ -727,7 +732,7 @@ void RefreshSensorData()
   if (lastRefreshSensor_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
   {
 
-    t_out = random(30);
+    //t_out = random(30);
     //    tempSensors.requestTemperatures();
     //    Serial.println("A1");
     //    t_out1 = tempSensors.getTempCByIndex(0);
@@ -742,8 +747,8 @@ void RefreshSensorData()
     //    t_inn[ROOM_GOST] = dht.readTemperature();
     //t_vent = t_out1;
     //t_out = (t_out2 < t_out1 || t_out1 < -100) && t_out2 > -100 ? t_out2 : t_out1;
-    Serial.print("t_out= ");
-    Serial.println(t_out);
+    //    Serial.print("!!!!!!!!!! T_OUT= ");
+    //    Serial.println(t_out);
     Serial.print("Temperature = ");
     Serial.print(bmp.readTemperature());
     Serial.println(" *C");
@@ -1014,7 +1019,7 @@ void refreshTemperature(bool allRooms, bool displayData) {
     for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
       t_inn[i] = random(-5, 35);
     }
-    t_out = random(-20, 35);
+    t_out = random(-200, 350) / 10.0;
   }
   else
   {

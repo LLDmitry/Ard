@@ -39,6 +39,7 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
+//const byte ROOM_NUMBER = ROOM_GOST;
 const byte ROOM_NUMBER = ROOM_BED;
 
 const unsigned long ALARM_INTERVAL_S = 2;
@@ -165,7 +166,7 @@ void PrepareCommandNRF()
   nrfResponse.tInnSet = t_set;
 
   float cc1;
-  nrfResponse.tInnDec = modff(t_inn, &cc1);
+  nrfResponse.tInnDec = modff(abs(t_inn), &cc1) * 10;
   nrfResponse.tInn = (int)cc1;
   nrfResponse.tInnSign = t_inn < 0 ? '-' : '+';
 
@@ -254,7 +255,6 @@ void HandleInputNrfCommand()
     //    Serial.println(nrfRequest.tInnSet);
 
     t_outSign = nrfRequest.tOutSign;
-    t_outSign = '-';  //d
     t_outInt = nrfRequest.tOut;
     t_outDec = nrfRequest.tOutDec;
     t_out = t_outInt + ((float)t_outDec / 10.0f);
@@ -466,6 +466,7 @@ void DisplayData(enDisplayMode toDisplayMode)
       display.println(abs((int)((t_inn - (int)t_inn) * 10)));
 
       //display set temp
+      display.drawLine(81, 0, 81, display.height() - 1, WHITE);
       if (t_set_on)
       {
         byte x, y;
