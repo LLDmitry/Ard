@@ -121,7 +121,7 @@ enum EnModeVent { V_AUTO_OFF, V_AUTO_SPEED1, V_AUTO_SPEED2, V_AUTO_SPEED3, V_TO_
 float t_inn[10];         //температура внутри, по комнатам
 byte h[10];              //влажность внутри, по комнатам
 int co2[10];             //co2 по комнатам
-float t_set[10];         //желаемая температура по комнатам
+byte t_set[10];         //желаемая температура по комнатам
 float vent_set[10];      //желаемая вентиляция по комнатам
 boolean nagrevStatus[10];//состояние батарей по комнатам (true/false)
 EnModeVent modeVent[10]; //вентиляция по комнатам
@@ -223,7 +223,7 @@ bool allowChangeSettings;
 bool motionDetected;
 bool isSetup;
 
-volatile byte heat_status_room[ROOMS_NUMBER]; //0-off, 1-on, 2-on in progress; 3-err
+volatile byte heat_moment_status_room[ROOMS_NUMBER]; //0-off, 1-on, 2-on in progress; 3-err
 volatile byte heat_control_room[ROOMS_NUMBER]; //0-off, 1-on
 volatile byte currentRoom;
 volatile byte prevTempSet;
@@ -289,11 +289,11 @@ void backupSetsTempOneRoom(byte room)
   Serial.println(room);
   for (int s = 0; s < 5; s++) {
     char a[4];
-    ("s" + (String)s + (String)room).toCharArray(a, 4);
+    ("s" + (String)s + (String)(room - 1)).toCharArray(a, 4);
     Serial.print(a);
     Serial.print(": ");
-    Serial.println(setsTemp[room][s]);
-    prefs.putUInt(a, setsTemp[room][s]);
+    Serial.println(setsTemp[room - 1][s]);
+    prefs.putUInt(a, setsTemp[room - 1][s]);
   }
 }
 
@@ -899,7 +899,8 @@ void changeHomeMode(homeMode_enum newHomeMode, bool authoChange)
 
 void displayCurrentRoomHeaterTemperature()
 {
-  Serial.println("displayCurrentRoomHeaterTemperature");
+  Serial.print("displayCurrentRoomHeaterTemperature:");
+  Serial.println(t_set[currentRoom - 1]);
   Blynk.virtualWrite(VP_ROOM_TMP_SET, t_set[currentRoom - 1]);
 }
 
@@ -1033,16 +1034,18 @@ BLYNK_WRITE(VP_ROOM_SELECT)
   byte prevCurrentRoom = currentRoom;
   currentRoom = param.asInt();
   displayCurrentRoomInfo();
-  displayCurrentRoomTemperatuteSet(prevCurrentRoom);
+  displayCurrentRoomTemperatuteSet(prevCurrentRoom, false);
   displayCurrentRoomHeaterTemperature();
   displayCurrentRoomHeatBtn();
   Serial.println("Room=" + currentRoom);
   prevTempSet = 0; //reset on room select or mode select
 }
 
-void displayCurrentRoomTemperatuteSet(byte prevCurrentRoom)
+void displayCurrentRoomTemperatuteSet(byte prevCurrentRoom, bool needRefresh)
 {
-  if (setsTemp[prevCurrentRoom - 1][0] != setsTemp[currentRoom - 1][0] ||
+  Serial.print("displayCurrentRoomTemperatuteSet");
+  if (needRefresh ||
+      setsTemp[prevCurrentRoom - 1][0] != setsTemp[currentRoom - 1][0] ||
       setsTemp[prevCurrentRoom - 1][1] != setsTemp[currentRoom - 1][1] ||
       setsTemp[prevCurrentRoom - 1][2] != setsTemp[currentRoom - 1][2] ||
       setsTemp[prevCurrentRoom - 1][3] != setsTemp[currentRoom - 1][3] ||
@@ -1074,11 +1077,15 @@ BLYNK_WRITE(VP_ROOM_HEAT_BTN)
   {
     Serial.println("VP_ROOM_HEAT_BTN=0");
     prevTempSet = t_set[currentRoom - 1]; // for restoring in future
+    Serial.print("Off_prevTempSet=");
+    Serial.println(prevTempSet);
     roomTempSet(0);
   }
   else
   {
     Serial.println("VP_ROOM_HEAT_BTN=1");
+    Serial.print("On_prevTempSet=");
+    Serial.println(prevTempSet);
     roomTempSet(prevTempSet > 0 ? prevTempSet : 1); //restore
   }
   displayCurrentRoomHeaterTemperature();
@@ -1187,19 +1194,19 @@ void setRoomHeatStatus(bool allRooms, bool dispalyData)
   {
     Serial.println("allRooms");
     for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
-      heat_status_room[i] = heat_control_room[i];
+      heat_moment_status_room[i] = heat_control_room[i];
       if (checkHeatSwitch(i + 1))
       {
-        heat_status_room[i] = 2;
+        heat_moment_status_room[i] = 2;
       }
     }
   }
   else
   {
-    heat_status_room[currentRoom - 1] = heat_control_room[currentRoom - 1];
+    heat_moment_status_room[currentRoom - 1] = heat_control_room[currentRoom - 1];
     if (checkHeatSwitch(currentRoom))
     {
-      heat_status_room[currentRoom - 1] = 2;
+      heat_moment_status_room[currentRoom - 1] = 2;
     }
   }
   if (dispalyData)
@@ -1219,7 +1226,7 @@ bool checkHeatSwitch(byte room)
   //    Serial.print("set_temp_room ");
   //    Serial.println(t_set[room - 1]);
   //  }
-  //return (heat_status_room[room - 1] == 1 && t_inn[room - 1] < setsTemp[room - 1][t_set[room - 1] - 1]); //включить нагрев
+  //return (heat_moment_status_room[room - 1] == 1 && t_inn[room - 1] < setsTemp[room - 1][t_set[room - 1] - 1]); //включить нагрев
   return true;
 }
 
@@ -1231,7 +1238,7 @@ void displayPowerHeatersLevel()
   float maxPowerHeater = 0.0;
   for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
     maxPowerHeater += powerHeaters[i];
-    if (heat_status_room[i] == 2)
+    if (heat_moment_status_room[i] == 2)
       totalPowerHeaters += powerHeaters[i];
   }
   byte calcTo100TotalPowerHeaters = (float)(100 * (totalPowerHeaters / maxPowerHeater));
@@ -1252,10 +1259,13 @@ void roomTempSet(byte tSet)
   Serial.print("roomTempSet() ");
   Serial.println(tSet);
   t_set[currentRoom - 1] = tSet;
-  defaultTemp[homeMode][currentRoom - 1] = t_set[currentRoom - 1];
+
+
+  defaultTemp[homeMode][currentRoom - 1] = t_set[currentRoom - 1]; //?
   char a[3];
   ((String)homeMode + (String)(currentRoom - 1)).toCharArray(a, 3);
   prefs.putUInt(a, defaultTemp[homeMode][currentRoom - 1]);
+
 
   heat_control_room[currentRoom - 1] = (tSet > 0);
   setRoomHeatStatus(false, true);
@@ -1265,9 +1275,9 @@ void roomTempSet(byte tSet)
 void displayCurrentRoomInfo()
 {
   Serial.print("displayCurrentRoomInfo ");
-  Serial.println(heat_status_room[currentRoom - 1]);
+  Serial.println(heat_moment_status_room[currentRoom - 1]);
   Blynk.virtualWrite(VP_ROOM_TMP, t_inn[currentRoom - 1]);
-  switch (heat_status_room[currentRoom - 1])
+  switch (heat_moment_status_room[currentRoom - 1])
   {
     case 0:
       Blynk.setProperty(VP_ROOM_TMP, "color", "#0047AB");
@@ -1411,16 +1421,11 @@ void execTerminalCommands(String command)
 
         if (keyCommand == SET_ROOM_TEMP_MODE) //настройка шкалы температуры в комнате
         {
-          setsTemp[keyRoom][i - 3] = getValue(str);
-          //prefs.putUInt(a, defaultTemp[keyCommand][getRoom(str)]);
+          setsTemp[keyRoom - 1][i - 3] = getValue(str);
         }
         else  // установка значений температуры для режима по комнатам
         {
-          defaultTemp[keyCommand][getRoom(str)] = getValue(str);
-          if (keyCommand == homeMode)
-          {
-            changeHomeMode(homeMode, false); //чтобы стразу применилось если текущий mode = настраиваемому
-          }
+          defaultTemp[keyCommand][getRoom(str) - 1] = getValue(str);
         }
       }
     }
@@ -1430,9 +1435,13 @@ void execTerminalCommands(String command)
   {
     // backup шкалы температуры в настраиваемой комнате
     backupSetsTempOneRoom(keyRoom);
+    if (keyRoom == currentRoom)
+      displayCurrentRoomTemperatuteSet(currentRoom, true); //чтобы стразу применилось если текущая room = настраиваемой
   }
-  else  // backup установленных значений температуры для настраиваемого режима по комнатам
+  else  // backup установленных значений температуры по комнатам для настраиваемого режима
     backupDefaultTempOneMode(keyCommand);
+  if (keyCommand == homeMode)
+    changeHomeMode(homeMode, false); //чтобы стразу применилось если текущий mode = настраиваемому
 
   //  if (command.startsWith(setWord))
   //  {
@@ -1469,14 +1478,14 @@ byte getRoom(String key) //key=  к3  или к3т23
   //Serial.print("getRoom ");
   //Serial.println(key.length());
   //Serial.println(key);
-  int r = key.substring(2, 3).toInt() - 1;
+  int r = key.substring(2, 3).toInt();
   //Serial.print("r: ");;
   //Serial.println(r);
   return r;
 }
 
 byte getValue(String key)
-{ 
+{
   key.toLowerCase();
   Serial.print("getValue ");
   Serial.println(key.length());

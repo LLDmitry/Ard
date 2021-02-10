@@ -82,6 +82,7 @@ byte t_outSign = '+';
 byte t_outDec = 0;
 boolean heaterStatus = false;
 boolean isAlarmFromCenter = false;
+boolean t_setChangedInRoom = false;
 byte alarmMaxStatusFromCenter = 0;
 byte alarmMaxStatusRoomFromCenter = 0;
 enum enDisplayMode { DISPLAY_AUTO, DISPLAY_INN_TMP, DISPLAY_OUT_TMP, DISPLAY_ALARM };
@@ -260,13 +261,14 @@ void HandleInputNrfCommand()
     if (t_outSign == '-')
       t_out = -t_out;
 
-    if (nrfRequest.tInnSet < 100 && t_set != nrfRequest.tInnSet)
+    if (nrfRequest.tInnSet < 100 && t_set != nrfRequest.tInnSet && !t_setChangedInRoom) //if t_setChangedInRoom, will ignore obsolete data from centralControl
     {
       t_set = nrfRequest.tInnSet;
       t_set_on = t_set > 0;
       SaveTSetEEPROM();
       HeaterControl();
     }
+    t_setChangedInRoom = false; //сбросим признак чтобы в следующий прием данных принять их от centralControl
     //    Serial.print("t_out= ");
     //    Serial.println(t_out);
     //    Serial.print("t_set= ");
@@ -331,6 +333,8 @@ float ConvertFromByte(byte param, byte val)
 
 void SaveTSetEEPROM()
 {
+  Serial.print("SaveTSetEEPROM:");
+  Serial.println(t_set);
   EEPROM.put(EEPROM_ADR_SET_TEMP, t_set);
   EEPROM.put(EEPROM_ADR_SET_TEMP + 1, t_set_on);
 }
@@ -359,6 +363,7 @@ void ChangeSetTemp(int sign)
     isAlarmFromCenter = false;
     alarmMaxStatusFromCenter = 0;
     alarmMaxStatusRoomFromCenter = 0;
+    exit;
   }
 
   if (sign == 1)
@@ -380,6 +385,7 @@ void ChangeSetTemp(int sign)
   else if (sign == "!")
     t_set_on = !t_set_on;
 
+  t_setChangedInRoom = true;
   SaveTSetEEPROM();
   HeaterControl();
   PrepareCommandNRF();
