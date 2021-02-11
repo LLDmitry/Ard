@@ -88,6 +88,8 @@ const unsigned long AUTO_REFRESH_DISPLAY_PERIOD_S = 10;
 const unsigned long INPUT_COMMAND_DISPLAY_PERIOD_S = 60;
 const unsigned long GET_EXTERNAL_DATA_INTERVAL_S = 600;
 
+const byte mainRoomTmpInn = ROOM_GOST;
+
 //Параметры комфорта
 const float MIN_COMFORT_ROOM_TEMP_WINTER = 18.0;
 const float MIN_COMFORT_ROOM_TEMP_SUMMER = 21.0;
@@ -289,11 +291,11 @@ void backupSetsTempOneRoom(byte room)
   Serial.println(room);
   for (int s = 0; s < 5; s++) {
     char a[4];
-    ("s" + (String)s + (String)(room - 1)).toCharArray(a, 4);
+    ("s" + (String)s + (String)(room)).toCharArray(a, 4);
     Serial.print(a);
     Serial.print(": ");
-    Serial.println(setsTemp[room - 1][s]);
-    prefs.putUInt(a, setsTemp[room - 1][s]);
+    Serial.println(setsTemp[room][s]);
+    prefs.putUInt(a, setsTemp[room][s]);
   }
 }
 
@@ -455,7 +457,7 @@ void ReadCommandNRF() //from reponse
   if ( radio.available() )
   {
     bool done = false;
-    Serial.println("radio.available!!");
+    Serial.println("                                  radio.available!!");
     radio.read(&nrfResponse, sizeof(nrfResponse));
     delay(20);
     radio.flush_rx();
@@ -612,13 +614,13 @@ void SendCommandNRF(byte roomNumber)
 void ParseAndHandleInputNrfCommand()
 {
   nrfCommandProcessing = true;
-  Serial.print("roomNumber= ");
+  Serial.print("                                                  RoomNumber= ");
   Serial.println(nrfResponse.roomNumber);
-  Serial.print("Tinn= ");
+  Serial.print("                                                   Tinn= ");
   Serial.println(nrfResponse.tInn);
 
   alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
-  t_inn[nrfResponse.roomNumber] = nrfResponse.tInn;
+  t_inn[nrfResponse.roomNumber] = (nrfResponse.tInn + nrfResponse.tInnDec / 10.0) * (nrfResponse.tInnSign == '-' ? -1 : 1);
   co2[nrfResponse.roomNumber] = nrfResponse.co2;
 
   if (nrfResponse.roomNumber == ROOM_BED)
@@ -644,6 +646,10 @@ void ParseAndHandleInputNrfCommand()
     Serial.print("              Tout2= ");
     Serial.println(nrfResponse.tOut);
   }
+  if (nrfResponse.roomNumber == currentRoom)
+    displayCurrentRoomInfo();
+  if (nrfResponse.roomNumber == mainRoomTmpInn)
+    RefreshMainRoomTmpInn();
   //      h[nrfResponse.roomNumber] = nrfResponse.h;
   //      t_set[nrfResponse.roomNumber] = nrfResponse.t_set;
   //
@@ -905,15 +911,15 @@ void changeHomeMode(homeMode_enum newHomeMode, bool authoChange)
 void displayCurrentRoomHeaterTemperature()
 {
   Serial.print("displayCurrentRoomHeaterTemperature:");
-  Serial.println(t_set[currentRoom - 1]);
-  Blynk.virtualWrite(VP_ROOM_TMP_SET, t_set[currentRoom - 1]);
+  Serial.println(t_set[currentRoom]);
+  Blynk.virtualWrite(VP_ROOM_TMP_SET, t_set[currentRoom]);
 }
 
 void displayCurrentRoomHeatBtn()
 {
   Serial.print("displayCurrentRoomHeatBtn ");
-  Serial.println(heat_control_room[currentRoom - 1]);
-  Blynk.virtualWrite(VP_ROOM_HEAT_BTN, heat_control_room[currentRoom - 1]);
+  Serial.println(heat_control_room[currentRoom]);
+  Blynk.virtualWrite(VP_ROOM_HEAT_BTN, heat_control_room[currentRoom]);
 }
 
 BLYNK_WRITE(VP_TMP_BTN_REFRESH)
@@ -1003,7 +1009,7 @@ BLYNK_READ(VP_TMP_OUT)
 void displayCurrentData()
 {
   Serial.println("displayCurrentData");
-  Blynk.virtualWrite(VP_TMP_IN, t_inn[0]);
+  RefreshMainRoomTmpInn();
   Blynk.virtualWrite(VP_TMP_OUT, t_out);
   Blynk.virtualWrite(VP_TMP_BTN_REFRESH, LOW);
 
@@ -1011,20 +1017,25 @@ void displayCurrentData()
   displayPowerHeatersLevel();
 }
 
+void RefreshMainRoomTmpInn()
+{
+  Blynk.virtualWrite(VP_TMP_IN, t_inn[mainRoomTmpInn]);
+}
+
 void refreshTemperature(bool allRooms, bool displayData) {
   Serial.println("refreshTemperatures");
 
   if (allRooms)
   {
-    for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
-      t_inn[i] = random(-5, 35);
-    }
+    //    for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
+    //      t_inn[i] = random(-5, 35);
+    //    }
     t_out = random(-200, 350) / 10.0;
   }
-  else
-  {
-    t_inn[currentRoom - 1] = random(-5, 35);
-  }
+  //  else
+  //  {
+  //    t_inn[currentRoom] = random(-5, 35);
+  //  }
 
   setRoomHeatStatus(allRooms, false);
   if (displayData)
@@ -1037,7 +1048,7 @@ BLYNK_WRITE(VP_ROOM_SELECT)
 {
   Serial.println("VP_ROOM_SELECT");
   byte prevCurrentRoom = currentRoom;
-  currentRoom = param.asInt();
+  currentRoom = param.asInt() - 1;
   displayCurrentRoomInfo();
   displayCurrentRoomTemperatuteSet(prevCurrentRoom, false);
   displayCurrentRoomHeaterTemperature();
@@ -1050,19 +1061,18 @@ void displayCurrentRoomTemperatuteSet(byte prevCurrentRoom, bool needRefresh)
 {
   Serial.print("displayCurrentRoomTemperatuteSet");
   if (needRefresh ||
-      setsTemp[prevCurrentRoom - 1][0] != setsTemp[currentRoom - 1][0] ||
-      setsTemp[prevCurrentRoom - 1][1] != setsTemp[currentRoom - 1][1] ||
-      setsTemp[prevCurrentRoom - 1][2] != setsTemp[currentRoom - 1][2] ||
-      setsTemp[prevCurrentRoom - 1][3] != setsTemp[currentRoom - 1][3] ||
-      setsTemp[prevCurrentRoom - 1][4] != setsTemp[currentRoom - 1][4]
-     )
+      setsTemp[prevCurrentRoom][0] != setsTemp[currentRoom][0] ||
+      setsTemp[prevCurrentRoom][1] != setsTemp[currentRoom][1] ||
+      setsTemp[prevCurrentRoom][2] != setsTemp[currentRoom][2] ||
+      setsTemp[prevCurrentRoom][3] != setsTemp[currentRoom][3] ||
+      setsTemp[prevCurrentRoom][4] != setsTemp[currentRoom][4])
   {
     Blynk.setProperty(VP_ROOM_TMP_SET, "labels",
-                      setsTemp[currentRoom - 1][0],
-                      setsTemp[currentRoom - 1][1],
-                      setsTemp[currentRoom - 1][2],
-                      setsTemp[currentRoom - 1][3],
-                      setsTemp[currentRoom - 1][4]
+                      setsTemp[currentRoom][0],
+                      setsTemp[currentRoom][1],
+                      setsTemp[currentRoom][2],
+                      setsTemp[currentRoom][3],
+                      setsTemp[currentRoom][4]
                      );
   }
 }
@@ -1070,18 +1080,18 @@ void displayCurrentRoomTemperatuteSet(byte prevCurrentRoom, bool needRefresh)
 BLYNK_WRITE(VP_ROOM_HEAT_BTN)
 {
 
-  //  if (param.asInt() == 1 && t_set[currentRoom - 1] == 0) //try to push but T was not selected before -> unpush
+  //  if (param.asInt() == 1 && t_set[currentRoom] == 0) //try to push but T was not selected before -> unpush
   //  {
   //    Blynk.virtualWrite(VP_ROOM_HEAT_BTN, LOW);
   //    return;
   //  }
   //
-  //  heat_control_room[currentRoom - 1] = param.asInt();
+  //  heat_control_room[currentRoom] = param.asInt();
   //setRoomHeatStatus(false, true);
   if (param.asInt() == 0)
   {
     Serial.println("VP_ROOM_HEAT_BTN=0");
-    prevTempSet = t_set[currentRoom - 1]; // for restoring in future
+    prevTempSet = t_set[currentRoom]; // for restoring in future
     Serial.print("Off_prevTempSet=");
     Serial.println(prevTempSet);
     roomTempSet(0);
@@ -1208,10 +1218,10 @@ void setRoomHeatStatus(bool allRooms, bool dispalyData)
   }
   else
   {
-    heat_moment_status_room[currentRoom - 1] = heat_control_room[currentRoom - 1];
+    heat_moment_status_room[currentRoom] = heat_control_room[currentRoom];
     if (checkHeatSwitch(currentRoom))
     {
-      heat_moment_status_room[currentRoom - 1] = 2;
+      heat_moment_status_room[currentRoom] = 2;
     }
   }
   if (dispalyData)
@@ -1263,16 +1273,16 @@ void roomTempSet(byte tSet)
 {
   Serial.print("roomTempSet() ");
   Serial.println(tSet);
-  t_set[currentRoom - 1] = tSet;
+  t_set[currentRoom] = tSet;
 
 
-  defaultTemp[homeMode][currentRoom - 1] = t_set[currentRoom - 1]; //?
+  defaultTemp[homeMode][currentRoom] = t_set[currentRoom]; //?
   char a[3];
-  ((String)homeMode + (String)(currentRoom - 1)).toCharArray(a, 3);
-  prefs.putUInt(a, defaultTemp[homeMode][currentRoom - 1]);
+  ((String)homeMode + (String)(currentRoom)).toCharArray(a, 3);
+  prefs.putUInt(a, defaultTemp[homeMode][currentRoom]);
 
 
-  heat_control_room[currentRoom - 1] = (tSet > 0);
+  heat_control_room[currentRoom] = (tSet > 0);
   setRoomHeatStatus(false, true);
   displayCurrentRoomHeatBtn();
 }
@@ -1280,9 +1290,9 @@ void roomTempSet(byte tSet)
 void displayCurrentRoomInfo()
 {
   Serial.print("displayCurrentRoomInfo ");
-  Serial.println(heat_moment_status_room[currentRoom - 1]);
-  Blynk.virtualWrite(VP_ROOM_TMP, t_inn[currentRoom - 1]);
-  switch (heat_moment_status_room[currentRoom - 1])
+  Serial.println(heat_moment_status_room[currentRoom]);
+  Blynk.virtualWrite(VP_ROOM_TMP, t_inn[currentRoom]);
+  switch (heat_moment_status_room[currentRoom])
   {
     case 0:
       Blynk.setProperty(VP_ROOM_TMP, "color", "#0047AB");
@@ -1299,7 +1309,7 @@ void displayCurrentRoomInfo()
       Blynk.virtualWrite(VP_ROOM_HEAT_BTN, LOW);
       break;
   }
-  Blynk.virtualWrite(VP_ROOM_TMP, t_inn[currentRoom - 1]);
+  //Blynk.virtualWrite(VP_ROOM_TMP, t_inn[currentRoom]);
 }
 
 BLYNK_WRITE(VP_PASSWORD_TXT)
@@ -1381,7 +1391,7 @@ void execTerminalCommands(String command)
 
   String typeComnand;
   homeMode_enum keyCommand;
-  byte keyRoom;
+  byte keyRoom; //starts from 1
 
   command.toCharArray(char_array, str_len);
   char *p = char_array;
@@ -1439,8 +1449,8 @@ void execTerminalCommands(String command)
   if (keyCommand == SET_ROOM_TEMP_MODE) //установка шкалы температуры в комнате
   {
     // backup шкалы температуры в настраиваемой комнате
-    backupSetsTempOneRoom(keyRoom);
-    if (keyRoom == currentRoom)
+    backupSetsTempOneRoom(keyRoom - 1);
+    if (keyRoom - 1 == currentRoom)
       displayCurrentRoomTemperatuteSet(currentRoom, true); //чтобы стразу применилось если текущая room = настраиваемой
   }
   else  // backup установленных значений температуры по комнатам для настраиваемого режима

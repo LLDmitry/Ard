@@ -43,7 +43,7 @@
 const byte ROOM_NUMBER = ROOM_BED;
 
 const unsigned long ALARM_INTERVAL_S = 2;
-const unsigned long REFRESH_SENSOR_INTERVAL_S = 20;  //1 мин
+const unsigned long REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const unsigned long READ_COMMAND_NRF_INTERVAL_S = 1;
 const unsigned long CHECK_ALARM_SENSOR_PERIOD_S = 10;
 const unsigned long SHOW_TMP_INN_S = 10;
@@ -466,7 +466,7 @@ void DisplayData(enDisplayMode toDisplayMode)
       display.println(abs((int)((t_inn - (int)t_inn) * 10)));
 
       //display set temp
-      display.drawLine(81, 0, 81, display.height() - 1, WHITE);
+      display.drawLine(81, 1, 81, display.height() - 2, WHITE);
       if (t_set_on)
       {
         byte x, y;
@@ -542,10 +542,12 @@ byte CalculateStartX(byte lngth, bool isInnerTemp)
       return isInnerTemp ? 15 : 30;
     case 8:
       return isInnerTemp ? 10 : 22;
+    case 9:
+      return isInnerTemp ? 9 : 22;
     case 10:
-      return isInnerTemp ? 7 : 18;
+      return isInnerTemp ? 7 : 20;
     case 11:
-      return isInnerTemp ? 5 : 16;
+      return isInnerTemp ? 5 : 18;
     case 12:
       return isInnerTemp ? 3 : 14;
     case 13:
@@ -579,7 +581,7 @@ byte CalculateIntSymbolsLength(byte tInt, char tSign)
   for (int i = 0; i < 3; i++)
   {
     if (text[i] == '-' )
-      rslt = rslt + 2;
+      rslt = rslt + 3;
     if (text[i] == '1')
       rslt = rslt + 5;
     else if (text[i] == '2' || text[i] == '3' || text[i] == '4' || text[i] == '5' || text[i] == '6' || text[i] == '7' || text[i] == '8' || text[i] == '9' || text[i] == '0')
