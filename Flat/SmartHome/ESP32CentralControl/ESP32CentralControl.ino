@@ -451,7 +451,7 @@ void RadioSetup()
   //radio.printDetails();
 }
 
-void ReadCommandNRF() //from reponse
+void ReadCommandNRF() //from SENSORS (данные пришли не в авто-респонсе)
 {
   Serial.println("                                     ReadCommandNRF()");
   if ( radio.available() )
@@ -461,7 +461,7 @@ void ReadCommandNRF() //from reponse
     radio.read(&nrfResponse, sizeof(nrfResponse));
     delay(20);
     radio.flush_rx();
-    Serial.print("received data from room: ");
+    Serial.print("received data from sensor: ");
     Serial.println(nrfResponse.roomNumber);
     Serial.print("received Command: ");
     Serial.println(nrfResponse.Command);
@@ -618,6 +618,8 @@ void ParseAndHandleInputNrfCommand()
   Serial.println(nrfResponse.roomNumber);
   Serial.print("                                                   Tinn= ");
   Serial.println(nrfResponse.tInn);
+  Serial.print("                                                   TSet= ");
+  Serial.println(nrfResponse.tInnSet);
 
   alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
   t_inn[nrfResponse.roomNumber] = (nrfResponse.tInn + nrfResponse.tInnDec / 10.0) * (nrfResponse.tInnSign == '-' ? -1 : 1);
@@ -648,14 +650,27 @@ void ParseAndHandleInputNrfCommand()
     Serial.println(nrfResponse.tOut);
   }
   t_out = random(-200, 350) / 10.0;  //d
-
-  if (nrfResponse.roomNumber == currentRoom)
-    displayCurrentRoomInfo();
-  if (nrfResponse.roomNumber == mainRoomTmpInn)
-    RefreshMainRoomTmpInn();
   //      h[nrfResponse.roomNumber] = nrfResponse.h;
-  //      t_set[nrfResponse.roomNumber] = nrfResponse.t_set;
-  //
+
+  if (nrfResponse.tInnSet != 100 && nrfResponse.tInnSet != t_set[nrfResponse.roomNumber])
+  {
+    t_set[nrfResponse.roomNumber] = nrfResponse.tInnSet;
+    if (nrfResponse.roomNumber == currentRoom) //при изменении установки сразу отрефрешить текущую комнату
+    {
+      displayCurrentRoomHeaterTemperature();
+      displayCurrentRoomHeatBtn();
+    }
+  }
+
+  //  Для экономии трафика не будем рефпешить показания температуры сразу (т.к. это не очень важные данные), это произойдет по 2мин таймеру от блинк или по кнопке "Refresh".
+  //  if (nrfResponse.roomNumber == currentRoom)
+  //    displayCurrentRoomInfo();
+  //  if (nrfResponse.roomNumber == mainRoomTmpInn)
+  //    RefreshMainRoomTmpInn();
+
+
+
+  //Work with Alarm
   //      switch (nrfResponse.alarmType) // { ALR_NO, ALR_VODA, ALR_DOOR }
   //      {
   //        case ALR_VODA:

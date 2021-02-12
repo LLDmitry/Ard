@@ -82,7 +82,7 @@ byte t_outInt = 0;
 byte t_outSign = '+';
 byte t_outDec = 0;
 boolean heaterStatus = false;
-boolean isAlarmFromCenter = false;
+boolean isActiveAlarmFromCenter = false;
 boolean t_setChangedInRoom = false;
 byte alarmMaxStatusFromCenter = 0;
 byte alarmMaxStatusRoomFromCenter = 0;
@@ -213,7 +213,7 @@ void CheckAlarmSensor()
 
 void AlarmSignal()
 {
-  digitalWrite(BUZZ_PIN, isAlarmFromCenter);
+  digitalWrite(BUZZ_PIN, isActiveAlarmFromCenter);
 }
 
 //Get Command
@@ -299,7 +299,9 @@ void HandleInputNrfCommand()
 
     if (nrfRequest.alarmMaxStatus > 0) //central send it to this room
     {
-      isAlarmFromCenter = true;  //reset only by button
+      Serial.print("Alarm! ");
+      Serial.println(nrfRequest.alarmMaxStatus);
+      isActiveAlarmFromCenter = true;  //reset only by button
       alarmMaxStatusFromCenter = nrfRequest.alarmMaxStatus;
       alarmMaxStatusRoomFromCenter = nrfRequest.alarmMaxStatusRoom;
       DisplayData(DISPLAY_ALARM);
@@ -350,17 +352,16 @@ void SaveTSetsEEPROM()
 void HeaterControl()
 {
   Serial.println("HeaterControl");
-  heaterStatus =  (t_set_on && set_temp[t_set - 1] > t_inn);
+  heaterStatus = (t_set_on && set_temp[t_set - 1] > t_inn);
   digitalWrite(HEATER_PIN, heaterStatus);
   //DisplayData(DISPLAY_INN_TMP);
 }
 
 void ChangeSetTemp(int sign)
 {
-
-  if (isAlarmFromCenter)  //reset alarm info by any button
+  if (isActiveAlarmFromCenter)  //reset alarm info by any button
   {
-    isAlarmFromCenter = false;
+    isActiveAlarmFromCenter = false;
     alarmMaxStatusFromCenter = 0;
     alarmMaxStatusRoomFromCenter = 0;
     exit;
@@ -388,6 +389,7 @@ void ChangeSetTemp(int sign)
   t_setChangedInRoom = true;
   SaveTSetEEPROM();
   HeaterControl();
+  DisplayData(DISPLAY_INN_TMP);
   PrepareCommandNRF();
 }
 
@@ -395,7 +397,7 @@ void CheckButtons()
 {
   switch (btnP.Loop()) {
     case SB_CLICK:
-      Serial.println("btnPShort");
+      Serial.println("    btn + Short");
       ChangeSetTemp(1);
       break;
     case SB_LONG_CLICK:
@@ -405,7 +407,7 @@ void CheckButtons()
   }
   switch (btnM.Loop()) {
     case SB_CLICK:
-      Serial.println("btnMShort");
+      Serial.println("    btn - Short");
       ChangeSetTemp(-1);
       break;
     case SB_LONG_CLICK:
@@ -417,12 +419,12 @@ void CheckButtons()
 
 void DisplayData(enDisplayMode toDisplayMode)
 {
-  if (isAlarmFromCenter)
+  if (isActiveAlarmFromCenter)
     toDisplayMode = DISPLAY_ALARM;
 
   if (toDisplayMode != DISPLAY_AUTO || displayMode == DISPLAY_INN_TMP && displayMode_ms > SHOW_TMP_INN_S * 1000 || displayMode == DISPLAY_OUT_TMP && displayMode_ms > SHOW_TMP_OUT_S * 1000)
   {
-    if (toDisplayMode == DISPLAY_AUTO)
+    if (toDisplayMode == DISPLAY_AUTO && toDisplayMode != DISPLAY_ALARM)
     {
       if (displayMode == DISPLAY_INN_TMP)
         displayMode = DISPLAY_OUT_TMP;
@@ -431,13 +433,13 @@ void DisplayData(enDisplayMode toDisplayMode)
     }
     else
     {
-      if (toDisplayMode = DISPLAY_INN_TMP)
-      {
-        displayMode = DISPLAY_INN_TMP;
-      }
+      displayMode = toDisplayMode;
     }
     if (toDisplayMode == DISPLAY_AUTO)
       displayMode_ms = 0;
+
+    Serial.print("displayMode= ");
+    Serial.println(displayMode);
 
     //display.setFont(&FreeSerif9pt7b);
     display.clear();
@@ -497,11 +499,11 @@ void DisplayData(enDisplayMode toDisplayMode)
       byte i = 1;
       display.drawRect(i, i, display.width() - 2 * i, display.height() - 2 * i, WHITE);
       byte lngth = CalculateIntSymbolsLength(t_outInt, t_outSign);
-      Serial.print("lngth= ");
-      Serial.println(lngth);
+      //      Serial.print("lngth= ");
+      //      Serial.println(lngth);
       byte startX = CalculateStartX(lngth, false);
-      Serial.print("startX= ");
-      Serial.println(startX);
+      //      Serial.print("startX= ");
+      //      Serial.println(startX);
       if (t_outSign == '-')
       {
         display.setCursor(startX, 30);
@@ -519,11 +521,11 @@ void DisplayData(enDisplayMode toDisplayMode)
     else if (displayMode == DISPLAY_ALARM)
     {
       display.setTextSize(3);
-      display.setCursor(100, 10);
+      display.setCursor(10, 10);
       display.println("ALARM");
-      display.setCursor(100, 25);
+      display.setCursor(10, 25);
       display.println(alarmMaxStatusFromCenter);
-      display.setCursor(100, 50);
+      display.setCursor(10, 50);
       display.println(alarmMaxStatusRoomFromCenter);
     }
     display.update();
@@ -576,8 +578,8 @@ byte CalculateIntSymbolsLength(byte tInt, char tSign)
   else
     sprintf(text, "%d", tInt);
 
-  Serial.print("text= ");
-  Serial.println(text);
+  //  Serial.print("text= ");
+  //  Serial.println(text);
   for (int i = 0; i < 3; i++)
   {
     if (text[i] == '-' )
