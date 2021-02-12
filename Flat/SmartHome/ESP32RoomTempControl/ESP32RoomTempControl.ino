@@ -473,20 +473,20 @@ void DisplayData(enDisplayMode toDisplayMode)
         if ((int)set_temp[t_set - 1] < 10)
           x = 100;
         else
-          x = 88;
+          x = 91;
         display.setTextSize(3);
         if (t_inn < (float)set_temp[t_set - 1] - 0.5)
           y = 6;
         else if (t_inn > (float)set_temp[t_set - 1] + 0.5)
-          y = 42;
+          y = 40;
         else
-          y = 22;
+          y = 24;
         display.setCursor(x, y);
         display.println((int)set_temp[t_set - 1]);
       }
       else
       {
-        display.setCursor(90, 35);
+        display.setCursor(92, 46);
         display.println("OFF");
       }
     }

@@ -394,7 +394,7 @@ void setup()
   getWeatherData();
   //String sTime = &timeinfo, "%A, %B %d %Y %H:%M:%S";
   Blynk.notify("Device started ");
-  timer.setInterval(600000L, refreshAllTemperatures); //10minutes
+  //timer.setInterval(600000L, refreshAllTemperatures); //10minutes
   timer.setInterval(3600000L, everyHourTimer); //sync time
   timer.setInterval(60000L, everyMinTimer);    //incremet inner time
   timer.setInterval(10000L, every10SecTimer);    //checkAlarm
@@ -621,6 +621,7 @@ void ParseAndHandleInputNrfCommand()
 
   alarmStatus[nrfResponse.roomNumber] = nrfResponse.alarmType;
   t_inn[nrfResponse.roomNumber] = (nrfResponse.tInn + nrfResponse.tInnDec / 10.0) * (nrfResponse.tInnSign == '-' ? -1 : 1);
+
   co2[nrfResponse.roomNumber] = nrfResponse.co2;
 
   if (nrfResponse.roomNumber == ROOM_BED)
@@ -646,6 +647,8 @@ void ParseAndHandleInputNrfCommand()
     Serial.print("              Tout2= ");
     Serial.println(nrfResponse.tOut);
   }
+  t_out = random(-200, 350) / 10.0;  //d
+
   if (nrfResponse.roomNumber == currentRoom)
     displayCurrentRoomInfo();
   if (nrfResponse.roomNumber == mainRoomTmpInn)
@@ -731,6 +734,11 @@ void ParseAndHandleInputNrfCommand()
   //      }
   //      break;
   //  }
+}
+
+void RefreshMainRoomTmpInn()
+{
+  Blynk.virtualWrite(VP_TMP_IN, t_inn[mainRoomTmpInn]);
 }
 
 void RefreshSensorData()
@@ -924,16 +932,16 @@ void displayCurrentRoomHeatBtn()
 
 BLYNK_WRITE(VP_TMP_BTN_REFRESH)
 {
-  int btnVal = param.asInt();
-  if (btnVal == HIGH)
+  if (param.asInt() == HIGH)
   {
-    refreshTemperature(true, true);
+    //refreshTemperature(true, true);
+    displayCurrentData();
   }
 }
 
-void refreshAllTemperatures() {
-  refreshTemperature(true, false);
-}
+//void refreshAllTemperatures() {
+//  refreshTemperature(true, false);
+//}
 
 void every10SecTimer() {
   //d  if (motionDetected && homeMode == GUARD_MODE)
@@ -1017,32 +1025,26 @@ void displayCurrentData()
   displayPowerHeatersLevel();
 }
 
-void RefreshMainRoomTmpInn()
-{
-  Blynk.virtualWrite(VP_TMP_IN, t_inn[mainRoomTmpInn]);
-}
-
-void refreshTemperature(bool allRooms, bool displayData) {
-  Serial.println("refreshTemperatures");
-
-  if (allRooms)
-  {
-    //    for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
-    //      t_inn[i] = random(-5, 35);
-    //    }
-    t_out = random(-200, 350) / 10.0;
-  }
-  //  else
-  //  {
-  //    t_inn[currentRoom] = random(-5, 35);
-  //  }
-
-  setRoomHeatStatus(allRooms, false);
-  if (displayData)
-  {
-    displayCurrentData();
-  }
-}
+//void refreshTemperature(bool allRooms, bool displayData) {
+//  Serial.println("refreshTemperatures");
+//
+//  //if (allRooms)
+//  //{
+//  //    for (int i = 0; i <= ROOMS_NUMBER - 1; i++) {
+//  //      t_inn[i] = random(-5, 35);
+//  //    }
+//  //}
+//  //  else
+//  //  {
+//  //    t_inn[currentRoom] = random(-5, 35);
+//  //  }
+//
+//  setRoomHeatStatus(allRooms, false);
+//  if (displayData)
+//  {
+//    displayCurrentData();
+//  }
+//}
 
 BLYNK_WRITE(VP_ROOM_SELECT)
 {
