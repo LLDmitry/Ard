@@ -41,7 +41,7 @@
 #define VP_ROOM_HEAT_STATUS V24
 #define VP_LCD_ROW1         V25
 #define VP_LCD_ROW2         V26
-#define VP_ROOM_TEMP_SET2   V28
+#define VP_CONNECTION_STATUS     V28
 
 #define VP_DEVICE1_BTN      V30
 #define VP_DEVICE2_BTN      V31
@@ -186,6 +186,18 @@ String cityID = "482443"; //Токсово
 
 const byte ROOMS_NUMBER = 10;
 const byte EEPROM_SIZE = 1;
+const byte MAX_ALLOWED_MISS_CONNECTIONS = 5;
+
+//счетчик пропущенных подряд коннектов. Если > MAX_ALLOWED_MISS_CONNECTIONS то считаем что ошибка соединения с этой комнатой
+byte missedConnectionsCounter[ROOMS_NUMBER][1] = {
+  {0},
+  {0},
+  {0},
+  {0},
+  {0},
+  {0},
+  {0},
+};
 
 int powerHeaters[ROOMS_NUMBER] = {800, 2000, 2000, 500, 800, 1000, 1000};
 byte setsTemp[ROOMS_NUMBER][5] = {
@@ -594,13 +606,17 @@ void SendCommandNRF(byte roomNumber)
     Serial.println("Success Send");
     delay(20);
     if (!radio.isAckPayloadAvailable() )   // Ждем получения..
+    {
       Serial.println(F("Empty response."));
+      StatusNRFConnectionHandle(roomNumber, '1');
+    }
     else
     {
       radio.read(&nrfResponse, sizeof(nrfResponse));
       delay(20);
       radio.flush_rx();
       Serial.print(F("RESPONSE! from "));
+      StatusNRFConnectionHandle(roomNumber, '0');
       Serial.println(nrfResponse.roomNumber);
       ParseAndHandleInputNrfCommand();
     }
@@ -608,8 +624,28 @@ void SendCommandNRF(byte roomNumber)
   else
   {
     Serial.println("Failed Send");
+    StatusNRFConnectionHandle(roomNumber, '2');
   }
+  Serial.print("                                                  missedConnectionsCounter[roomNumber][0]= ");
+  Serial.println(missedConnectionsCounter[roomNumber][0]);
 }
+
+void StatusNRFConnectionHandle(byte roomNumber, char staus) //0-success, 1-send but no response, 2-not send
+{
+  if (staus == '0')
+    missedConnectionsCounter[roomNumber][0] = 0;
+  else if (staus == '1' || staus == '2')
+    missedConnectionsCounter[roomNumber][0] = missedConnectionsCounter[roomNumber][0] + (missedConnectionsCounter[roomNumber][0] == 250 ? 0 : 1);
+
+  if (currentRoom == roomNumber)
+    ShowCurrentRoomConnectionStatus();
+}
+
+void ShowCurrentRoomConnectionStatus()
+{
+  Blynk.virtualWrite(VP_CONNECTION_STATUS, missedConnectionsCounter[currentRoom][0] > MAX_ALLOWED_MISS_CONNECTIONS ? 255 : 0);
+}
+
 
 void ParseAndHandleInputNrfCommand()
 {
@@ -1070,6 +1106,7 @@ BLYNK_WRITE(VP_ROOM_SELECT)
   displayCurrentRoomTemperatuteSet(prevCurrentRoom, false);
   displayCurrentRoomHeaterTemperature();
   displayCurrentRoomHeatBtn();
+  ShowCurrentRoomConnectionStatus();
   Serial.println("Room=" + currentRoom);
   prevTempSet = 0; //reset on room select or mode select
 }

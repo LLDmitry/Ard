@@ -44,7 +44,7 @@ const byte ROOM_NUMBER = ROOM_BED;
 
 const unsigned long ALARM_INTERVAL_S = 2;
 const unsigned long REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
-const unsigned long READ_COMMAND_NRF_INTERVAL_S = 1;
+const unsigned long READ_COMMAND_NRF_INTERVAL_S = 10;
 const unsigned long CHECK_ALARM_SENSOR_PERIOD_S = 10;
 const unsigned long SHOW_TMP_INN_S = 10;
 const unsigned long SHOW_TMP_OUT_S = 3;
@@ -52,6 +52,7 @@ const unsigned long SHOW_TMP_OUT_S = 3;
 const int EEPROM_ADR_SET_TEMP = 1023; //last address in eeprom for store tSet
 const float T_SET_MIN = 1.0f;  //0.0f - off
 const float T_SET_MAX = 25.0f;
+const byte MAX_ALLOWED_MISS_CONNECTIONS = 5;
 
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
 
@@ -88,6 +89,8 @@ byte alarmMaxStatusFromCenter = 0;
 byte alarmMaxStatusRoomFromCenter = 0;
 enum enDisplayMode { DISPLAY_AUTO, DISPLAY_INN_TMP, DISPLAY_OUT_TMP, DISPLAY_ALARM };
 enDisplayMode displayMode = DISPLAY_OUT_TMP;
+byte missConnectionsCounter = 0;
+bool noNRFConnection = false;
 
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
@@ -225,6 +228,7 @@ void ReadCommandNRF()
     _delay_ms(10);
     if (radio.available())
     {
+      missConnectionsCounter = 0;
       int cntAvl = 0;
       radio.read(&nrfRequest, sizeof(nrfRequest));
       delay(20);
@@ -233,6 +237,10 @@ void ReadCommandNRF()
       HandleInputNrfCommand();
       doAfterRead();
     }
+    else
+      missConnectionsCounter = missConnectionsCounter + (missConnectionsCounter < 250 ? 1 : 0);
+
+    noNRFConnection = missConnectionsCounter > MAX_ALLOWED_MISS_CONNECTIONS;
     readCommandNRF_ms = 0;
   }
 }
@@ -246,66 +254,64 @@ void doAfterRead()
 
 void HandleInputNrfCommand()
 {
-  if (nrfRequest.roomNumber == ROOM_NUMBER) //вообще-то проверка не нужна - из-за разных каналов должно придти только этой Room
+  //    Serial.println(600 + nrfRequest.p);
+  //    Serial.println(nrfRequest.Command);
+  //    Serial.println(nrfRequest.minutes);
+  Serial.println("HandleInputNrfCommand:");
+  Serial.println(nrfRequest.tOut);
+  //    Serial.println(nrfRequest.tInnSet);
+
+  t_outSign = nrfRequest.tOutSign;
+  t_outInt = nrfRequest.tOut;
+  t_outDec = nrfRequest.tOutDec;
+  t_out = t_outInt + ((float)t_outDec / 10.0f);
+  if (t_outSign == '-')
+    t_out = -t_out;
+
+  if (nrfRequest.tInnSet < 100 && t_set != nrfRequest.tInnSet && !t_setChangedInRoom) //if t_setChangedInRoom, will ignore obsolete data from centralControl
   {
-    //    Serial.println(600 + nrfRequest.p);
-    //    Serial.println(nrfRequest.Command);
-    //    Serial.println(nrfRequest.minutes);
-    //    Serial.println(nrfRequest.tOut);
-    //    Serial.println(nrfRequest.tInnSet);
+    t_set = nrfRequest.tInnSet;
+    t_set_on = t_set > 0;
+    SaveTSetEEPROM();
+    HeaterControl();
+  }
+  t_setChangedInRoom = false; //сбросим признак чтобы в следующий прием данных принять их от centralControl
+  //    Serial.print("t_out= ");
+  //    Serial.println(t_out);
+  //    Serial.print("t_set= ");
+  //    Serial.println(t_set);
+  //    Serial.print("tInnSetVal1= ");
+  //    Serial.println(nrfRequest.tInnSetVal1);
 
-    t_outSign = nrfRequest.tOutSign;
-    t_outInt = nrfRequest.tOut;
-    t_outDec = nrfRequest.tOutDec;
-    t_out = t_outInt + ((float)t_outDec / 10.0f);
-    if (t_outSign == '-')
-      t_out = -t_out;
+  if (nrfRequest.tInnSetVal1 <= 30 && set_temp[0] != nrfRequest.tInnSetVal1 ||
+      nrfRequest.tInnSetVal2 <= 30 && set_temp[1] != nrfRequest.tInnSetVal2 ||
+      nrfRequest.tInnSetVal3 <= 30 && set_temp[2] != nrfRequest.tInnSetVal3 ||
+      nrfRequest.tInnSetVal4 <= 30 && set_temp[3] != nrfRequest.tInnSetVal4 ||
+      nrfRequest.tInnSetVal5 <= 30 && set_temp[4] != nrfRequest.tInnSetVal5)
+  {
+    if (nrfRequest.tInnSetVal1 <= 30)
+      set_temp[0] = nrfRequest.tInnSetVal1;
+    if (nrfRequest.tInnSetVal2 <= 30)
+      set_temp[1] = nrfRequest.tInnSetVal2;
+    if (nrfRequest.tInnSetVal3 <= 30)
+      set_temp[2] = nrfRequest.tInnSetVal3;
+    if (nrfRequest.tInnSetVal4 <= 30)
+      set_temp[3] = nrfRequest.tInnSetVal4;
+    if (nrfRequest.tInnSetVal5 <= 30)
+      set_temp[4] = nrfRequest.tInnSetVal5;
 
-    if (nrfRequest.tInnSet < 100 && t_set != nrfRequest.tInnSet && !t_setChangedInRoom) //if t_setChangedInRoom, will ignore obsolete data from centralControl
-    {
-      t_set = nrfRequest.tInnSet;
-      t_set_on = t_set > 0;
-      SaveTSetEEPROM();
-      HeaterControl();
-    }
-    t_setChangedInRoom = false; //сбросим признак чтобы в следующий прием данных принять их от centralControl
-    //    Serial.print("t_out= ");
-    //    Serial.println(t_out);
-    //    Serial.print("t_set= ");
-    //    Serial.println(t_set);
-    //    Serial.print("tInnSetVal1= ");
-    //    Serial.println(nrfRequest.tInnSetVal1);
+    SaveTSetsEEPROM();
+    HeaterControl();
+  }
 
-    if (nrfRequest.tInnSetVal1 <= 30 && set_temp[0] != nrfRequest.tInnSetVal1 ||
-        nrfRequest.tInnSetVal2 <= 30 && set_temp[1] != nrfRequest.tInnSetVal2 ||
-        nrfRequest.tInnSetVal3 <= 30 && set_temp[2] != nrfRequest.tInnSetVal3 ||
-        nrfRequest.tInnSetVal4 <= 30 && set_temp[3] != nrfRequest.tInnSetVal4 ||
-        nrfRequest.tInnSetVal5 <= 30 && set_temp[4] != nrfRequest.tInnSetVal5)
-    {
-      if (nrfRequest.tInnSetVal1 <= 30)
-        set_temp[0] = nrfRequest.tInnSetVal1;
-      if (nrfRequest.tInnSetVal2 <= 30)
-        set_temp[1] = nrfRequest.tInnSetVal2;
-      if (nrfRequest.tInnSetVal3 <= 30)
-        set_temp[2] = nrfRequest.tInnSetVal3;
-      if (nrfRequest.tInnSetVal4 <= 30)
-        set_temp[3] = nrfRequest.tInnSetVal4;
-      if (nrfRequest.tInnSetVal5 <= 30)
-        set_temp[4] = nrfRequest.tInnSetVal5;
-
-      SaveTSetsEEPROM();
-      HeaterControl();
-    }
-
-    if (nrfRequest.alarmMaxStatus > 0) //central send it to this room
-    {
-      Serial.print("Alarm! ");
-      Serial.println(nrfRequest.alarmMaxStatus);
-      isActiveAlarmFromCenter = true;  //reset only by button
-      alarmMaxStatusFromCenter = nrfRequest.alarmMaxStatus;
-      alarmMaxStatusRoomFromCenter = nrfRequest.alarmMaxStatusRoom;
-      DisplayData(DISPLAY_ALARM);
-    }
+  if (nrfRequest.alarmMaxStatus > 0) //central send it to this room
+  {
+    Serial.print("Alarm! ");
+    Serial.println(nrfRequest.alarmMaxStatus);
+    isActiveAlarmFromCenter = true;  //reset only by button
+    alarmMaxStatusFromCenter = nrfRequest.alarmMaxStatus;
+    alarmMaxStatusRoomFromCenter = nrfRequest.alarmMaxStatusRoom;
+    DisplayData(DISPLAY_ALARM);
   }
 }
 
@@ -494,29 +500,40 @@ void DisplayData(enDisplayMode toDisplayMode)
     }
     else if (displayMode == DISPLAY_OUT_TMP)
     {
-      //внешняя температура - внутри рамки
-      display.setTextSize(4);
-      byte i = 1;
-      display.drawRect(i, i, display.width() - 2 * i, display.height() - 2 * i, WHITE);
-      byte lngth = CalculateIntSymbolsLength(t_outInt, t_outSign);
-      //      Serial.print("lngth= ");
-      //      Serial.println(lngth);
-      byte startX = CalculateStartX(lngth, false);
-      //      Serial.print("startX= ");
-      //      Serial.println(startX);
-      if (t_outSign == '-')
+      if (noNRFConnection)
       {
-        display.setCursor(startX, 30);
-        display.setTextSize(2);
-        display.print("-");
+        display.setTextSize(3);
+        display.setCursor(48, 10);
+        display.print("NO");
+        display.setCursor(0, 40);
+        display.print("CONNECT");
       }
-      display.setTextSize(4);
-      display.setCursor(CalculateIntX(startX, t_outSign), 20);
-      display.print(abs(t_outInt));
-      display.setTextSize(3);
-      display.setCursor(CalculateDecX(startX, lngth, t_outSign), 26);
-      display.print(".");
-      display.println(t_outDec);
+      else
+      {
+        //внешняя температура - внутри рамки
+        display.setTextSize(4);
+        byte i = 1;
+        display.drawRect(i, i, display.width() - 2 * i, display.height() - 2 * i, WHITE);
+        byte lngth = CalculateIntSymbolsLength(t_outInt, t_outSign);
+        //      Serial.print("lngth= ");
+        //      Serial.println(lngth);
+        byte startX = CalculateStartX(lngth, false);
+        //      Serial.print("startX= ");
+        //      Serial.println(startX);
+        if (t_outSign == '-')
+        {
+          display.setCursor(startX, 30);
+          display.setTextSize(2);
+          display.print("-");
+        }
+        display.setTextSize(4);
+        display.setCursor(CalculateIntX(startX, t_outSign), 20);
+        display.print(abs(t_outInt));
+        display.setTextSize(3);
+        display.setCursor(CalculateDecX(startX, lngth, t_outSign), 26);
+        display.print(".");
+        display.println(t_outDec);
+      }
     }
     else if (displayMode == DISPLAY_ALARM)
     {
