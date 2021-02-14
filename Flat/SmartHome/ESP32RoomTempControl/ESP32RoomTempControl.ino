@@ -39,8 +39,8 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-//const byte ROOM_NUMBER = ROOM_GOST;
-const byte ROOM_NUMBER = ROOM_BED;
+const byte ROOM_NUMBER = ROOM_GOST;
+//const byte ROOM_NUMBER = ROOM_BED;
 
 const unsigned long ALARM_INTERVAL_S = 2;
 const unsigned long REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
@@ -181,9 +181,6 @@ void PrepareCommandNRF()
   nrfResponse.co2 = random(200); // если подключен датчик
   //nrfResponse.addParam1 = t_hot; // если подключен датчик
   //nrfResponse.h= h_v;  // если подключен датчик
-
-  uint8_t f = radio.flush_tx();
-  radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
 }
 
 void RefreshSensorData()
@@ -191,12 +188,16 @@ void RefreshSensorData()
   if (lastRefreshSensor_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
   {
     Serial.println("RefreshSensorData");
-    //    sensors.requestTemperatures();
-    //    t_inn = sensors.getTempC(InnTempDeviceAddress);
-    t_inn = (float)random(150) / 10.0; //debug
-    //    t_outThisRoom = sensors.getTempC(OutTempDeviceAddress);
-    //    //t_hot = sensors.getTempC(HotVodaTempDeviceAddress);
-    //
+    sensors.requestTemperatures();
+    t_inn = sensors.getTempC(InnTempDeviceAddress);
+    t_outThisRoom = sensors.getTempC(OutTempDeviceAddress);
+    //    t_hot = sensors.getTempC(HotVodaTempDeviceAddress);
+//    Serial.print("t_inn: ");
+//    Serial.println(t_inn);
+//    Serial.print("t_outThisRoom: ");
+//    Serial.println(t_outThisRoom);
+
+   // t_inn = (float)random(150) / 10.0; //debug
 
     PrepareCommandNRF();
     HeaterControl();
@@ -228,6 +229,9 @@ void ReadCommandNRF()
     _delay_ms(10);
     if (radio.available())
     {
+      uint8_t f = radio.flush_tx();
+      radio.writeAckPayload(1, &nrfResponse, sizeof(nrfResponse));          // Pre-load an ack-paylod into the FIFO buffer for pipe 1
+
       missConnectionsCounter = 0;
       int cntAvl = 0;
       radio.read(&nrfRequest, sizeof(nrfRequest));
