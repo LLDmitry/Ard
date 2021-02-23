@@ -20,14 +20,14 @@ enum enRequestCommand { RQ_NO, RQ_T_INFO, RQ_CLOSE_VODA_1, RQ_CLOSE_VODA_2, RQ_A
 enum enResponseCommand { RSP_NO, RSP_INFO, RSP_COMMAND };
 enum enAlarmType { ALR_NO, ALR_VODA, ALR_MOTION, ALR_PEREGREV };
 enum enRooms { ROOM_GOST, ROOM_BED, ROOM_KITCHEN, ROOM_HALL, ROOM_GUEST1, ROOM_GUEST2, ROOM_VANNA1, ROOM_VANNA2, ROOM_VENT, ROOM_SENSOR};
-
+const byte TOTAL_ROOMS_NUMBER = 10;
 //!!! все property д.б. byte, иначе будет разная длина в Atmega и ESP32
 //Request - от Central к Room
 typedef struct {
   byte Command;               //тип команды
   byte roomNumber; 	          //команда для комнаты №
   byte tOutSign;              //внешняя темп  '+' '-'
-  byte tOut;                  //внешняя темп
+  byte tOut;                  //внешняя темп целая часть
   byte tOutDec;               //внешняя темп десятые
   byte p;                     //атм давление, целая часть - 600
   byte pDec;                  //атм давление, десятые
@@ -39,9 +39,9 @@ typedef struct {
   byte tInnSetVal3 = 100;       //установка температуры в комнате  3е значение 0..30, 100 - оставить без изменений
   byte tInnSetVal4 = 100;       //установка температуры в комнате  4е значение 0..30, 100 - оставить без изменений
   byte tInnSetVal5 = 100;       //установка температуры в комнате  5е значение 0..30, 100 - оставить без изменений
-  byte ventSpeed;             //установить скорость вентилятора (для комнат где есть вентилятор)
-  byte alarmMaxStatus;        //инф-я о max из статусов тревоги для отображения
-  byte alarmMaxStatusRoom;  	//№ комнаты с alarmMaxStatus
+  byte ventSpeed;               //установить скорость вентилятора (для комнат где есть вентилятор)
+  byte alarmMaxStatus = 0;      //инф-я о max из статусов тревоги для отображения
+  byte alarmMaxStatusRoom = 0;  //№ комнаты с alarmMaxStatus
 } NRFRequest;         	//18b
 
 //Response - от Room к Central
@@ -52,7 +52,7 @@ typedef struct {
   byte tInn;                                                                                  //целая часть
   byte tInnDec;                                                                               //десятые
   byte tOutSign;                                                                              //внешняя темп  '+' '-'
-  byte tOut;                                                                                  //внешняя темп
+  byte tOut;                                                                                  //внешняя темп целая часть
   byte tOutDec;                                                                               //внешняя темп десятые
   byte tInnSet = 100;	                                                                        //set_temp[k], k =0 - выкл, 1..5 , 100 - оставить без изменений
   byte nagrevStatus;                                                                          //1

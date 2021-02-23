@@ -36,11 +36,8 @@
 #define SDA_PIN         A4  //(SDA) I2C
 #define SCL_PIN         A5  //(SCK) I2C
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-
-const byte ROOM_NUMBER = ROOM_GOST;
-//const byte ROOM_NUMBER = ROOM_BED;
+//byte currentRoomNumber = ROOM_GOST; //up to TOTAL_ROOMS_NUMBER
+byte currentRoomNumber = ROOM_BED;
 
 const unsigned long ALARM_INTERVAL_S = 2;
 const unsigned long REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
@@ -48,6 +45,7 @@ const unsigned long READ_COMMAND_NRF_INTERVAL_S = 10;
 const unsigned long CHECK_ALARM_SENSOR_PERIOD_S = 10;
 const unsigned long SHOW_TMP_INN_S = 10;
 const unsigned long SHOW_TMP_OUT_S = 3;
+const unsigned long SET_ROOM_MODE_S = 10;
 
 const int EEPROM_ADR_SET_TEMP = 1023; //last address in eeprom for store tSet
 const float T_SET_MIN = 1.0f;  //0.0f - off
@@ -56,24 +54,22 @@ const byte MAX_ALLOWED_MISS_CONNECTIONS = 5;
 
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
 
-SButton btnP(BTN_P_PIN, 50, 1000, 5000, 15000);
-SButton btnM(BTN_M_PIN, 50, 1000, 5000, 15000);
+SButton btnP(BTN_P_PIN, 50, 1000, 5000, 30000);
+SButton btnM(BTN_M_PIN, 50, 1000, 5000, 30000);
 
 OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
 DeviceAddress InnTempDeviceAddress;
 DeviceAddress OutTempDeviceAddress;
 
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-//Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Adafruit_ssd1306syp display(SDA_PIN, SCL_PIN);
-//Adafruit_SSD1306 display(-1);
 
 elapsedMillis checkAlarmSensor_ms;
 elapsedMillis alarmInterval_ms;
 elapsedMillis lastRefreshSensor_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 elapsedMillis readCommandNRF_ms = 0;
 elapsedMillis displayMode_ms = 0;
+elapsedMillis setRoomMode_ms = 0;
 
 bool alarmSensor = false;
 float t_inn = 0.0f;
@@ -87,7 +83,7 @@ boolean isActiveAlarmFromCenter = false;
 boolean t_setChangedInRoom = false;
 byte alarmMaxStatusFromCenter = 0;
 byte alarmMaxStatusRoomFromCenter = 0;
-enum enDisplayMode { DISPLAY_AUTO, DISPLAY_INN_TMP, DISPLAY_OUT_TMP, DISPLAY_ALARM };
+enum enDisplayMode { DISPLAY_AUTO, DISPLAY_INN_TMP, DISPLAY_OUT_TMP, DISPLAY_ALARM, SET_ROOM };
 enDisplayMode displayMode = DISPLAY_OUT_TMP;
 byte missConnectionsCounter = 0;
 bool noNRFConnection = false;
@@ -122,7 +118,7 @@ void setup()
   radio.enableAckPayload();                     // Allow optional ack payloads
   //radio.enableDynamicPayloads();                // Ack payloads are dynamic payloads
   radio.setPayloadSize(32); //18
-  radio.setChannel(ArRoomsChannelsNRF[ROOM_NUMBER]);            // Установка канала вещания;
+  radio.setChannel(ArRoomsChannelsNRF[currentRoomNumber]);            // Установка канала вещания;
   radio.setRetries(0, 10);                // Установка интервала и количества попыток "дозвона" до приемника;
   radio.setDataRate(RF24_1MBPS);        // Установка скорости(RF24_250KBPS, RF24_1MBPS или RF24_2MBPS), RF24_250KBPS на nRF24L01 (без +) неработает.
   radio.setPALevel(RF24_PA_MAX);          // Установка максимальной мощности;
@@ -146,6 +142,8 @@ void setup()
   display.initialize();
 
   //SaveTSetsEEPROM(); //1st time
+  //SaveToEEPROM('r'); //1st time
+
   RestoreFromEEPROM();
 
   wdt_enable(WDTO_8S);
@@ -159,12 +157,13 @@ void RestoreFromEEPROM()
   {
     EEPROM.get(EEPROM_ADR_SET_TEMP + 1 + s, set_temp[s - 1]);
   }
+  EEPROM.get(EEPROM_ADR_SET_TEMP + 10, currentRoomNumber);
 }
 
 void PrepareCommandNRF()
 {
   nrfResponse.Command = RSP_INFO;
-  nrfResponse.roomNumber = ROOM_NUMBER;
+  nrfResponse.roomNumber = currentRoomNumber;
   nrfResponse.alarmType = alarmSensor ? ALR_MOTION : ALR_NO;
   nrfResponse.tInnSet = t_set;
 
@@ -192,12 +191,12 @@ void RefreshSensorData()
     t_inn = sensors.getTempC(InnTempDeviceAddress);
     t_outThisRoom = sensors.getTempC(OutTempDeviceAddress);
     //    t_hot = sensors.getTempC(HotVodaTempDeviceAddress);
-//    Serial.print("t_inn: ");
-//    Serial.println(t_inn);
-//    Serial.print("t_outThisRoom: ");
-//    Serial.println(t_outThisRoom);
+    //    Serial.print("t_inn: ");
+    //    Serial.println(t_inn);
+    //    Serial.print("t_outThisRoom: ");
+    //    Serial.println(t_outThisRoom);
 
-   // t_inn = (float)random(150) / 10.0; //debug
+    // t_inn = (float)random(150) / 10.0; //debug
 
     PrepareCommandNRF();
     HeaterControl();
@@ -276,7 +275,7 @@ void HandleInputNrfCommand()
   {
     t_set = nrfRequest.tInnSet;
     t_set_on = t_set > 0;
-    SaveTSetEEPROM();
+    SaveToEEPROM('t');
     HeaterControl();
   }
   t_setChangedInRoom = false; //сбросим признак чтобы в следующий прием данных принять их от centralControl
@@ -304,7 +303,7 @@ void HandleInputNrfCommand()
     if (nrfRequest.tInnSetVal5 <= 30)
       set_temp[4] = nrfRequest.tInnSetVal5;
 
-    SaveTSetsEEPROM();
+    SaveToEEPROM('s');
     HeaterControl();
   }
 
@@ -343,19 +342,26 @@ float ConvertFromByte(byte param, byte val)
   }
 }
 
-void SaveTSetEEPROM()
+void SaveToEEPROM(char command)
 {
-  Serial.print("SaveTSetEEPROM:");
+  Serial.print("SaveToEEPROM:");
+  Serial.println(command);
   Serial.println(t_set);
-  EEPROM.put(EEPROM_ADR_SET_TEMP, t_set);
-  EEPROM.put(EEPROM_ADR_SET_TEMP + 1, t_set_on);
-}
-
-void SaveTSetsEEPROM()
-{
-  for (int s = 1; s <= 5; s++)
+  if (command == 't')
   {
-    EEPROM.put(EEPROM_ADR_SET_TEMP + 1 + s, set_temp[s - 1]);
+    EEPROM.put(EEPROM_ADR_SET_TEMP, t_set);
+    EEPROM.put(EEPROM_ADR_SET_TEMP + 1, t_set_on);
+  }
+  else if (command == 's')
+  {
+    for (int s = 1; s <= 5; s++)
+    {
+      EEPROM.put(EEPROM_ADR_SET_TEMP + 1 + s, set_temp[s - 1]);
+    }
+  }
+  else if (command == 'r')
+  {
+    EEPROM.put(EEPROM_ADR_SET_TEMP + 10, currentRoomNumber);
   }
 }
 
@@ -367,7 +373,7 @@ void HeaterControl()
   //DisplayData(DISPLAY_INN_TMP);
 }
 
-void ChangeSetTemp(int sign)
+void HandleBtnClick(char command)
 {
   if (isActiveAlarmFromCenter)  //reset alarm info by any button
   {
@@ -377,30 +383,74 @@ void ChangeSetTemp(int sign)
     exit;
   }
 
-  if (sign == 1)
+  Serial.print("command=");
+  Serial.println(command);
+
+  if (command == 'p')
   {
-    t_set_on = true;
-    if (t_set < T_SET_MAX)
-      t_set += 1;
-  }
-  else if (sign == -1)
-  {
-    if (t_set > 1)
+    if (displayMode == SET_ROOM)
     {
-      t_set_on = true;
-      t_set -= 1;
+      if (currentRoomNumber < TOTAL_ROOMS_NUMBER - 2)
+        currentRoomNumber += 1;
+      else
+        currentRoomNumber = 0;
+      SaveToEEPROM('r');
+      DisplayData(SET_ROOM);
+      setRoomMode_ms = 0;
     }
     else
-      t_set_on = false;
+    {
+      t_set_on = true;
+      if (t_set < T_SET_MAX)
+        t_set += 1;
+    }
   }
-  else if (sign == "!")
-    t_set_on = !t_set_on;
 
-  t_setChangedInRoom = true;
-  SaveTSetEEPROM();
-  HeaterControl();
-  DisplayData(DISPLAY_INN_TMP);
-  PrepareCommandNRF();
+  else if (command == 'm')
+  {
+    if (displayMode == SET_ROOM)
+    {
+      if (currentRoomNumber > 0)
+        currentRoomNumber -= 1;
+      else
+        currentRoomNumber = TOTAL_ROOMS_NUMBER - 1;
+      SaveToEEPROM('r');
+      DisplayData(SET_ROOM);
+      setRoomMode_ms = 0;
+    }
+    else
+    {
+      if (t_set > 1)
+      {
+        t_set_on = true;
+        t_set -= 1;
+      }
+      else
+        t_set_on = false;
+    }
+  }
+
+  else if (command == '!')
+    if (displayMode == SET_ROOM)
+      displayMode = DISPLAY_AUTO;
+    else
+      t_set_on = !t_set_on;
+
+  else if (command == 'A')
+  {
+    Serial.println("command == A");
+    setRoomMode_ms = 0;
+    DisplayData(SET_ROOM);
+  }
+
+  if (displayMode != SET_ROOM)
+  {
+    t_setChangedInRoom = true;
+    SaveToEEPROM('t');
+    HeaterControl();
+    DisplayData(DISPLAY_INN_TMP);
+    PrepareCommandNRF();
+  }
 }
 
 void CheckButtons()
@@ -408,21 +458,29 @@ void CheckButtons()
   switch (btnP.Loop()) {
     case SB_CLICK:
       Serial.println("    btn + Short");
-      ChangeSetTemp(1);
+      HandleBtnClick('p');
       break;
     case SB_LONG_CLICK:
       Serial.println("btnPLong");
-      ChangeSetTemp("!");
+      HandleBtnClick('!');
+      break;
+    case SB_AUTO_CLICK:
+      Serial.println("btnAuto");
+      HandleBtnClick('A');
       break;
   }
   switch (btnM.Loop()) {
     case SB_CLICK:
       Serial.println("    btn - Short");
-      ChangeSetTemp(-1);
+      HandleBtnClick('m');
       break;
     case SB_LONG_CLICK:
       Serial.println("btnMLong");
-      ChangeSetTemp("!");
+      HandleBtnClick('!');
+      break;
+    case SB_AUTO_CLICK:
+      Serial.println("btnAuto");
+      HandleBtnClick('A');
       break;
   }
 }
@@ -432,19 +490,27 @@ void DisplayData(enDisplayMode toDisplayMode)
   if (isActiveAlarmFromCenter)
     toDisplayMode = DISPLAY_ALARM;
 
-  if (toDisplayMode != DISPLAY_AUTO || displayMode == DISPLAY_INN_TMP && displayMode_ms > SHOW_TMP_INN_S * 1000 || displayMode == DISPLAY_OUT_TMP && displayMode_ms > SHOW_TMP_OUT_S * 1000)
+  if (toDisplayMode != DISPLAY_AUTO ||
+      displayMode == DISPLAY_INN_TMP && displayMode_ms > SHOW_TMP_INN_S * 1000 ||
+      displayMode == DISPLAY_OUT_TMP && displayMode_ms > SHOW_TMP_OUT_S * 1000 ||
+      displayMode == SET_ROOM && setRoomMode_ms > SET_ROOM_MODE_S * 1000)
   {
-    if (toDisplayMode == DISPLAY_AUTO && toDisplayMode != DISPLAY_ALARM)
+    if (toDisplayMode == DISPLAY_AUTO)
     {
       if (displayMode == DISPLAY_INN_TMP)
         displayMode = DISPLAY_OUT_TMP;
-      else
+      else if (displayMode == DISPLAY_OUT_TMP)
         displayMode = DISPLAY_INN_TMP;
+      else if (displayMode == SET_ROOM)
+      {
+        Serial.println("Reset SET_ROOM");
+        displayMode = DISPLAY_INN_TMP;
+        displayMode_ms = 0;
+      }
     }
     else
-    {
       displayMode = toDisplayMode;
-    }
+
     if (toDisplayMode == DISPLAY_AUTO)
       displayMode_ms = 0;
 
@@ -548,6 +614,14 @@ void DisplayData(enDisplayMode toDisplayMode)
       display.println(alarmMaxStatusFromCenter);
       display.setCursor(10, 50);
       display.println(alarmMaxStatusRoomFromCenter);
+    }
+    else if (displayMode == SET_ROOM)
+    {
+      display.setTextSize(3);
+      display.drawCircle(64, 32, 30, WHITE);
+      display.setCursor((currentRoomNumber < 9 ? 58 : 48), 22);
+
+      display.println(currentRoomNumber + 1);
     }
     display.update();
     delay(200);
