@@ -14,8 +14,6 @@
 #include <math.h>
 
 #include <Wire.h>
-//#include <Adafruit_GFX.h>
-//#include <Adafruit_SSD1306.h>
 #include <Adafruit_ssd1306syp.h>
 #include <SPI.h>
 
@@ -38,8 +36,9 @@
 
 //byte currentRoomNumber = ROOM_GOST; //up to TOTAL_ROOMS_NUMBER
 byte currentRoomNumber = ROOM_BED;
+bool alarmSignal = false;
 
-const unsigned long ALARM_INTERVAL_S = 2;
+const unsigned long ALARM_BUZZ_INTERVAL_S = 2;
 const unsigned long REFRESH_SENSOR_INTERVAL_S = 60;  //1 мин
 const unsigned long READ_COMMAND_NRF_INTERVAL_S = 10;
 const unsigned long CHECK_ALARM_SENSOR_PERIOD_S = 10;
@@ -70,6 +69,8 @@ elapsedMillis lastRefreshSensor_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
 elapsedMillis readCommandNRF_ms = 0;
 elapsedMillis displayMode_ms = 0;
 elapsedMillis setRoomMode_ms = 0;
+elapsedMillis buzzOff_ms = 0;
+elapsedMillis buzzOn_ms = 0;
 
 bool alarmSensor = false;
 float t_inn = 0.0f;
@@ -216,7 +217,22 @@ void CheckAlarmSensor()
 
 void AlarmSignal()
 {
-  digitalWrite(BUZZ_PIN, isActiveAlarmFromCenter);
+  if (isActiveAlarmFromCenter)
+  {
+    if (!alarmSignal && buzzOff_ms > ALARM_BUZZ_INTERVAL_S * 1000)
+    {
+      alarmSignal = true;
+      buzzOn_ms = 0;
+    }
+    else if (alarmSignal && buzzOn_ms > ALARM_BUZZ_INTERVAL_S * 1000)
+    {
+      alarmSignal = false;
+      buzzOff_ms = 0;
+    }
+  }
+  else
+    alarmSignal = false;
+  digitalWrite(BUZZ_PIN, alarmSignal);
 }
 
 //Get Command
@@ -311,7 +327,7 @@ void HandleInputNrfCommand()
   {
     Serial.print("Alarm! ");
     Serial.println(nrfRequest.alarmMaxStatus);
-    isActiveAlarmFromCenter = true;  //reset only by button
+    isActiveAlarmFromCenter = true;  //will be reset only by button
     alarmMaxStatusFromCenter = nrfRequest.alarmMaxStatus;
     alarmMaxStatusRoomFromCenter = nrfRequest.alarmMaxStatusRoom;
     DisplayData(DISPLAY_ALARM);
@@ -694,5 +710,6 @@ void loop()
   CheckAlarmSensor();
   ReadCommandNRF();
   DisplayData(DISPLAY_AUTO);
+  AlarmSignal();
   wdt_reset();
 }
