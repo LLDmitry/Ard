@@ -1,3 +1,9 @@
+#include <FS.h>          // this needs to be first, or it all crashes and burns...
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+#ifdef ESP32
+#include <SPIFFS.h>
+#endif
+
 #include <RF24.h>
 #include <RF24_config.h>
 
@@ -81,10 +87,9 @@
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 RF24 radio(CE_PIN, CSN_PIN); //esp32 NRF24L01 - ce-17, cs-5, sck-18, miso-19, mosi-23)
 
-const unsigned long NRF_COMMUNICATION_INTERVAL_S = 10;
+const unsigned long NRF_COMMUNICATION_INTERVAL_S = 15;
 const unsigned long REFRESH_SENSOR_INTERVAL_S = 100;
 const unsigned long VENT_CORRECTION_PERIOD_S = 30; //5min
-const unsigned long AUTO_REFRESH_DISPLAY_PERIOD_S = 10;
 const unsigned long INPUT_COMMAND_DISPLAY_PERIOD_S = 60;
 const unsigned long GET_EXTERNAL_DATA_INTERVAL_S = 600;
 
@@ -97,13 +102,6 @@ const float MAX_COMFORT_ROOM_TEMP = 24.5;
 const float BORDER_WINTER_SUMMER = 10; // +10c
 
 const int arCO2Levels[3] = {450, 600, 900};
-
-const byte INDEX_ALARM_PNONE = 1;                   //index in phonesEEPROM[5]
-const byte MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES = 3;  //После MAX_NUMBER_ATTEMPTS_UNKNOWN_PHONES неудачных попыток (с вводом неверного пароля) за последние 10 мин, блокируем (не берем трубку) звонки с любых неизвестных номеров на 30мин либо до звонка с известного номера (что раньше).
-const byte ADR_EEPROM_RECALL_ME = 1;                //useRecallMeMode
-const byte ADR_EEPROM_STORED_PHONES = 100;          //начало списка 7значных номеров телефонов (5шт по 11 байт)
-const byte ADR_EEPROM_PASSWORD_UNKNOWN_PHONES = 10; //начало пароля для доступа неопознанных тел-в
-const byte ADR_EEPROM_PASSWORD_ADMIN = 20;          //начало админского пароля
 
 const byte ADR_EEPROM_SCENARIO1_NAGREV = 100;   //начало адресов температур по комнатам для SCENARIO1_NAGREV; а последнем адресе - период работы сценария, часов
 const byte ADR_EEPROM_SCENARIO2_NAGREV = 110;   //начало температур для SCENARIO2_NAGREV
@@ -158,22 +156,16 @@ OneWire ds(ONE_WIRE_PIN);
 DallasTemperature tempSensors(&ds);
 DeviceAddress outer1TempDeviceAddress;
 
+// WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
+WiFiManager wm;
 
-//unsigned long c = 0;
-//unsigned long ca = 0;
 
 NRFRequest nrfRequest;
 NRFResponse nrfResponse;
 boolean nrfCommandProcessing = false; //true when received nrf command
 
 // You should get Auth Token in the Blynk App.
-// Go to the Project Settings (nut icon).
-// Go to the Project Settings (nut icon).
-char blynkToken[] = "lxj-qafnfidshbCxIrGHQ4A12NZd2G4G";
-// Your WiFi credentials.
-// Set password to "" for open networks.
-char ssid[] = "WFDV";
-char pass[] = "31415926";
+char blynkToken[34] = "lxj-qafnfidshbCxIrGHQ4A12NZd2G4G";
 
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600 * 3;
@@ -285,6 +277,26 @@ void backupDefaultTemp()
   //prefs.end();
 }
 
+void backupBlynkToken()
+{
+  Serial.println("backupBlynkToken");
+  char a[4];
+  String sEeprom = "blk";
+  sEeprom.toCharArray(a, 4);
+  prefs.putString(a, blynkToken);
+}
+
+void restoreBlynkToken()
+{
+  Serial.println("restoreBlynkToken");
+  char a[4];
+  String sEeprom = "blk";
+  sEeprom.toCharArray(a, 4);
+  prefs.putString(a, blynkToken);
+  String sToken = prefs.getString(a, "000");
+  sToken.toCharArray(blynkToken, 100);
+}
+
 void backupDefaultTempOneMode(int setHomeMode)
 {
   for (int r = 0; r < ROOMS_NUMBER; r++) {
@@ -377,18 +389,44 @@ void setup()
   // Debug console
   Serial.begin(9600);
 
+  prefs.begin("nvs", false);
+
+  Serial.println("                    setupWiFiManager()_1 ");
+  setupWiFiManager();
+  Serial.println("                    setupWiFiManager()_2 ");
+
   //Blynk.begin(blynkToken, ssid, pass);
   WiFi.onEvent(WiFiStationConnected, SYSTEM_EVENT_STA_GOT_IP);
   WiFi.onEvent(WiFiStationDisconnected, SYSTEM_EVENT_STA_DISCONNECTED);
-  WiFi.begin(ssid, pass);
+
+  //WiFi.begin(ssid, pass);
+
+
+  //  String ss = WiFi.SSID();
+  //  String sp = WiFi.psk();
+  //  Serial.print("              SSID: ");
+  //  Serial.println(ss);
+  //  Serial.print("              psk: ");
+  //  Serial.println(sp);
+  //  char cs[10];
+  //  char cp[9];
+  //  ss.toCharArray(cs, ss.length() + 1);
+  //  ss.toCharArray(cp, sp.length() + 1);
+  //  WiFi.begin(cs, cp);
+
+  //  backupBlynkToken();
+  //  restoreBlynkToken();
+  //    Serial.print("                    blynkToken: ");
+  //    Serial.println(blynkToken);
+
   Blynk.config(blynkToken);
   if (Blynk.connect())
   {
-    Serial.printf("[%8lu] setup: Blynk connected\r\n", millis());
+    Serial.printf("[%8lu] setup: BKYNK connected\r\n", millis());
   }
   else
   {
-    Serial.printf("[%8lu] setup: Blynk no connected\r\n", millis());
+    Serial.printf("[%8lu] setup: BKYNK no connected\r\n", millis());
   }
   Serial.printf("[%8lu] Setup: Start timer reconnected\r\n", millis());
   numTimerReconnect = timer.setInterval(60000, ReconnectBlynk);
@@ -410,10 +448,8 @@ void setup()
   timer.setInterval(3600000L, everyHourTimer); //sync time
   timer.setInterval(60000L, everyMinTimer);    //incremet inner time
   timer.setInterval(10000L, every10SecTimer);    //checkAlarm
-  //eeprom analog
-  prefs.begin("nvs", false);
-  //backupDefaultTemp(); //1st time, comment after
 
+  //backupDefaultTemp(); //1st time, comment after
   restoreSettings();
 
   pinMode(BZZ_PIN, OUTPUT);
@@ -442,6 +478,50 @@ void setup()
   }
 
   isSetup = false;
+}
+
+
+void setupWiFiManager()
+{
+  // setup custom parameters
+  //
+  // The extra parameters to be configured (can be either global or just in the setup)
+  // After connecting, parameter.getValue() will get you the configured value
+  // id/name placeholder/prompt default length
+  WiFiManagerParameter customBlynkToken("blynkToken", "Blynk Token", blynkToken, 33);
+
+  //add all your parameters here
+  restoreBlynkToken();
+
+  Serial.print("!!!!                                   !blynkToken: ");
+  Serial.println(blynkToken);
+
+  wm.addParameter(&customBlynkToken);
+
+  //automatically connect using saved credentials if they exist
+  //If connection fails it starts an access point with the specified name
+  //here  "AutoConnectAP" if empty will auto generate basedcon chipid, if password is blank it will be anonymous
+  //and goes into a blocking loop awaiting configuration
+  if (!wm.autoConnect("AutoConnectAP", "password")) {
+    Serial.println("failed to connect and hit timeout. Do ESP.restart");
+    delay(3000);
+    // if we still have not connected restart and try all over again
+    ESP.restart();
+    delay(5000);
+  }
+
+  //always start configportal for a little while
+  //dl wm.setConfigPortalTimeout(60);
+  //dl wm.startConfigPortal("AutoConnectAP", "password");
+
+  //if you get here you have connected to the WiFi
+  Serial.println("!!!!!!!!!!!!Connected to WIFI!!!");
+  isWiFiConnected = true;
+
+  //read updated additional parameters
+  strcpy(blynkToken, customBlynkToken.getValue());
+
+  backupBlynkToken();
 }
 
 void RadioSetup()
@@ -626,8 +706,8 @@ void SendCommandNRF(byte roomNumber)
     Serial.println("Failed Send");
     StatusNRFConnectionHandle(roomNumber, '2');
   }
-  Serial.print("                                                  missedConnectionsCounter[roomNumber][0]= ");
-  Serial.println(missedConnectionsCounter[roomNumber][0]);
+  //  Serial.print("                                                  missedConnectionsCounter[roomNumber][0]= ");
+  //  Serial.println(missedConnectionsCounter[roomNumber][0]);
 }
 
 void StatusNRFConnectionHandle(byte roomNumber, char staus) //0-success, 1-send but no response, 2-not send
@@ -1692,6 +1772,7 @@ void BlynkRun(void)
   {
     if (Blynk.connected())
     {
+      //Serial.println("------Blynk.connected");
       if (timer.isEnabled(numTimerReconnect))
       {
         timer.disable(numTimerReconnect);
@@ -1701,12 +1782,17 @@ void BlynkRun(void)
     }
     else
     {
+      //Serial.println("------!!!Blynk.connected");
       if (!timer.isEnabled(numTimerReconnect))
       {
         timer.enable(numTimerReconnect);
         Serial.printf("[%8lu] BlynkRun: Start timer reconnected\r\n", millis());
       }
     }
+  }
+  else
+  {
+    //Serial.println("------!isWiFiConnected");
   }
 }
 
