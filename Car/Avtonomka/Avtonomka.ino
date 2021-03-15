@@ -34,9 +34,9 @@ const unsigned long DELAY_CO_CHECK_M    = 20;     //задержка для ра
 const float LOW_VALT                    = 11.5;
 const float HIGH_TEMP                   = 60.0;   //max допустимая температура корпуса автономки
 const unsigned long MAX_CO              = 350;
-const unsigned long WAIT_PERIOD_M       = 120;    //период ожидания включения, при этом подается питание автономки
-const unsigned long WAIT_LONG_PERIOD_M  = 720;    //долгий период ожидания включения, при этом не подается питание автономки
-const unsigned long LONG_PERIOD_ON_M = 480;       //после долгого ожидания WAIT_LONG_PERIOD_M включаем на LONG_PERIOD_ON_M
+const unsigned long WAIT_PERIOD_M       = 2; //120;    //период ожидания включения, при этом подается питание автономки
+const unsigned long WAIT_LONG_PERIOD_M  = 1; //720;    //долгий период ожидания включения, при этом не подается питание автономки
+const unsigned long LONG_PERIOD_ON_M    = 3; //480;       //после долгого ожидания WAIT_LONG_PERIOD_M включаем на LONG_PERIOD_ON_M
 const unsigned long ALARM_PERIOD_S      = 60;     //время подачи сигнала тревоги
 //const unsigned long ALARM_CO_BZZ_S      = 3;      //длительность сигнала тревоги по CO
 //const unsigned long ALARM_T_BZZ_S       = 2;      //длительность сигнала тревоги по T
@@ -59,11 +59,6 @@ enum EnAlarmStatuses { NONE, DETECTED, ALARM};
 enum EnMode { SLEEP, WAIT_START, WAIT_START_LONG_OFF, WAIT_START_LONG_ON, WORK, STOPPING, ALARM_AND_STOPPING};
 
 boolean isProcessBtnCode;
-boolean prevIgnitionStatus = false;
-//boolean ledOn = false;
-//boolean alarmBzzOn = false;
-String resultBtnCode;
-boolean setupMode = false;
 EnAlarmStatuses lowBatteryStatus = NONE;
 EnAlarmStatuses coStatus = NONE;
 EnAlarmStatuses highTemperatureStatus = NONE;
@@ -80,12 +75,11 @@ elapsedMillis batteryLowCheckPeriod_ms;
 elapsedMillis coCheckPeriod_ms;
 elapsedMillis checkAlarmPeriod_ms;
 elapsedMillis longPeriodOn_ms;
-//elapsedMillis alarmBzzOn_ms;
 elapsedMillis alarmBzzPause_ms;
 //elapsedMillis ledOn_ms;
 elapsedMillis ledPause_ms;
 
-SButton button1(BTTN_PIN, 50, 500, 10000, 1000);
+SButton button1(BTTN_PIN, 100, 3000, 10000, 1000);
 
 OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
@@ -116,13 +110,24 @@ void setup()
 
   attachInterrupt(1, NasosWorks, RISING);
 
+  mode = SLEEP;
+  lowBatteryStatus = NONE;
+  coStatus = NONE;
+  highTemperatureStatus = NONE;
+
+  Serial.println("Setup");
+
   _delay_ms(1000);
 
-  wdt_enable(WDTO_8S);
+  //wdt_enable(WDTO_8S);
 }
 
 void ActionBtn(byte typeClick) //'s' or 'l'
 {
+  Serial.print("ActionBtn:");
+  Serial.println(typeClick);
+  Serial.print("mode3=");
+  Serial.println(mode);
   if (typeClick == 's')
   {
     playDigitSignal(0, 1, 'a');
@@ -156,6 +161,8 @@ void ActionBtn(byte typeClick) //'s' or 'l'
       mode = WAIT_START_LONG_OFF;
     }
   }
+  Serial.print("mode4=");
+  Serial.println(mode);
 }
 
 void PrepareSleep()
@@ -325,27 +332,21 @@ void GoSleep()
 {
   PrepareSleep();
   Serial.println("DoSleep");
-  _delay_ms(20);
+  _delay_ms(50);
   DoSleep();
   //Serial.flush();
   _delay_ms(100);
   Serial.println("ExitSleep");
-  wdt_enable(WDTO_8S);
+  _delay_ms(50);
+  //wdt_enable(WDTO_8S);
 
   wdt_reset();
 }
 
-//автоотключение при отсутствии импульсов насоса или при alarm
-void AutoOff()
-{
-  if (offDelayPeriod_ms > OFF_DELAY_PERIOD_S * 1000)
-  {
-    mode = SLEEP;
-  }
-}
-
 void ModeControl()
 {
+  Serial.print("ModeControl_1=");
+  Serial.println(mode);
   if (mode == WAIT_START && waitPeriod_ms > WAIT_PERIOD_M * 60000 || mode == WAIT_START_LONG_ON && longPeriodOn_ms > LONG_PERIOD_ON_M * 60000)
   {
     mode = SLEEP;
@@ -365,9 +366,15 @@ void ModeControl()
     offDelayPeriod_ms = 0;
     mode = STOPPING;
   }
+  else if (mode == STOPPING && offDelayPeriod_ms > OFF_DELAY_PERIOD_S * 1000)
+  {
+    mode = SLEEP;
+  }
 
   digitalWrite(NASOS_PIN, (mode == WORK));
   digitalWrite(AVTONOMKA_PIN, (mode == WORK || mode == STOPPING));
+  Serial.print("ModeControl_2=");
+  Serial.println(mode);
 }
 
 void resetAlarm()
@@ -386,16 +393,16 @@ void playDigitSignal(byte numberLongSignals, byte numberShortSignals, char typeS
       digitalWrite(LED_PIN, HIGH);
     if (typeSignal == 'b' || typeSignal == 'a')
       digitalWrite(BZZ_PIN, HIGH);
-    delay(600);
+    _delay_ms(600);
     if (typeSignal == 'l' || typeSignal == 'a')
       digitalWrite(LED_PIN, LOW);
     if (typeSignal == 'b' || typeSignal == 'a')
       digitalWrite(BZZ_PIN, LOW);
-    delay(300);
+    _delay_ms(300);
     wdt_reset();
   }
   if (numberLongSignals > 0 && numberShortSignals >  0)
-    delay(500);
+    _delay_ms(500);
 
   //short
   for (int i = 1; i <= numberShortSignals; i++)
@@ -404,12 +411,12 @@ void playDigitSignal(byte numberLongSignals, byte numberShortSignals, char typeS
       digitalWrite(LED_PIN, HIGH);
     if (typeSignal == 'b' || typeSignal == 'a')
       digitalWrite(BZZ_PIN, HIGH);
-    delay(200);
+    _delay_ms(200);
     if (typeSignal == 'l' || typeSignal == 'a')
       digitalWrite(LED_PIN, LOW);
     if (typeSignal == 'b' || typeSignal == 'a')
       digitalWrite(BZZ_PIN, LOW);
-    delay(300);
+    _delay_ms(300);
     wdt_reset();
   }
 }
@@ -449,13 +456,17 @@ void alarmSignal()
 
 void loop()
 {
-  checkAlarms();
+  Serial.print("mode1=");
+  Serial.println(mode);
   checkButtons();
+  checkAlarms();
   checkNasosImpulses();
-  AutoOff();
   ModeControl();
   modeSignal();
   alarmSignal();
+  Serial.print("mode2=");
+  Serial.println(mode);
+  _delay_ms(50);
   if (mode == SLEEP)
     GoSleep();
 }
