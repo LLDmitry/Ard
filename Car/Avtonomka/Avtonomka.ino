@@ -24,7 +24,8 @@
 #define BZZ_PIN             8
 #define BAT_PIN             A0  //контроль напряжения батареи
 #define CO_SIGNAL_PIN       A1  //контроль CO
-#define NASOS_PIN           9   //на питание насоса, и на питание датчика CO
+#define CO_SRC_PIN          9   //на питание датчика CO
+#define NASOS_PIN           12  //на питание насоса
 #define AVTONOMKA_PIN       6  //на питание автономки
 #define LED_PIN             4   //LED индикации состояния
 
@@ -94,6 +95,7 @@ void setup()
   pinMode(BZZ_PIN, OUTPUT);
   stopBuzzer();
   pinMode(AVTONOMKA_PIN, OUTPUT);
+  pinMode(CO_SRC_PIN, OUTPUT);
   pinMode(NASOS_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
 
@@ -382,6 +384,7 @@ void ModeControl()
   }
 
   digitalWrite(NASOS_PIN, (mode == WORK));
+  digitalWrite(CO_SRC_PIN, (mode == WORK));
   digitalWrite(AVTONOMKA_PIN, (mode == WORK || mode == STOPPING));
   Serial.print("ModeControl_2=");
   Serial.println(mode);
