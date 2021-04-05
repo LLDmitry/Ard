@@ -29,8 +29,7 @@
 #define LED_PIN             4   //LED индикации состояния
 
 
-const unsigned long DELAY_CO_CHECK_M    = 20;     //задержка для разогрева датчика CO до начала приема его показаний
-//const unsigned long ALARM_DELAY_S     = 60;     //задержка выдачи сигнала тревоги после первого появления тревоги (фильтр ошибочных показаний)
+const unsigned long DELAY_CO_CHECK_M    = 20;     //задержка для разогрева и стабилизации датчика CO с момента 1го импульса насоса до начала приема его показаний
 const float LOW_VALT                    = 11.5;
 const float HIGH_TEMP_BODY              = 60.0;   //max допустимая температура корпуса автономки
 const float HIGH_TEMP_VYHLOP            = 90.0;   //max допустимая температура в районе выхлопа
@@ -42,8 +41,9 @@ const unsigned long ALARM_PAUSE_S       = 10;      //пауза между по�
 const unsigned long SIGNAL_PAUSE_S      = 10;      //пауза между повтором led сигнала режима работы
 const unsigned long OFF_DELAY_PERIOD_S  = 120;    //время через которое отключится питание автономки после пропадания импульсов насоса
 const unsigned long NASOS_IMPULSE_PERIOD_S      = 10;     //максимально возможный период импульсов насоса (для контроля включенной автономки)
-const unsigned long CO_CHECK_PERIOD_S           = 100; //если за это CO всегда High, выключить автономку
-const unsigned long BATTERY_LOW_CHECK_PERIOD_S  = 300; //если за это время баттарея всегда Low, выключить автономку (долго потому что еще может работать свеча)
+const unsigned long CO_CHECK_PERIOD_S           = 100; //если за это CO всегда High, подать сигнал, выключить автономку
+const unsigned long BATTERY_LOW_CHECK_PERIOD_S  = 300; //если за это время баттарея всегда Low, выключить автономку (долго потому что при старте работает свеча и напряжение будет низкое)
+const unsigned long TEMPERATURE_HIGH_CHECK_PERIOD_S = 30; ////если за это T всегда High, подать сигнал, выключить автономку
 const unsigned long CHECK_ALARM_PERIOD_S        = 10;  //период проверки различных alarms (только при работающей автономке)
 
 const unsigned int LOW_TONE             = 1600; //нижняя частота зумерв
@@ -73,6 +73,8 @@ elapsedMillis offDelayPeriod_ms;
 elapsedMillis nasosImpulsePeriod_ms;
 elapsedMillis batteryLowCheckPeriod_ms;
 elapsedMillis coCheckPeriod_ms;
+elapsedMillis highTempCheckPeriod_ms;
+elapsedMillis coRazorgrevPeriod_ms;
 elapsedMillis checkAlarmPeriod_ms;
 elapsedMillis longPeriodOn_ms;
 elapsedMillis alarmBzzPause_ms;
@@ -176,8 +178,13 @@ void PrepareSleep()
 
 void NasosWorks()
 {
-  mode = WORK;
+  Serial.println("NasosWorks");
   nasosImpulsePeriod_ms = 0;
+  if (mode == WAIT_START || mode == WAIT_START_LONG)
+  {
+    mode = WORK;
+    coRazorgrevPeriod_ms = 0;
+  }
 }
 
 void DoSleep()
@@ -211,22 +218,25 @@ void WakeUp()
 
 bool CheckCO()
 {
-  float curAnalogData = analogRead(CO_SIGNAL_PIN);
-  if (curAnalogData > MAX_CO)
+  if (coRazorgrevPeriod_ms >= DELAY_CO_CHECK_M * 60 * 1000)
   {
-    if (coStatus == NONE)
+    float curAnalogData = analogRead(CO_SIGNAL_PIN);
+    if (curAnalogData > MAX_CO)
     {
-      coStatus = DETECTED;
-      coCheckPeriod_ms = 0;
+      if (coStatus == NONE)
+      {
+        coStatus = DETECTED;
+        coCheckPeriod_ms = 0;
+      }
+      if (coStatus == DETECTED && coCheckPeriod_ms >= CO_CHECK_PERIOD_S * 1000)
+      {
+        coStatus = ALARM;
+      }
     }
-    if (coCheckPeriod_ms >= CO_CHECK_PERIOD_S * 1000)
+    else
     {
-      coStatus = ALARM;
+      coStatus == NONE;
     }
-  }
-  else
-  {
-    coStatus == NONE;
   }
   return (coStatus == ALARM);
 }
@@ -236,16 +246,18 @@ bool CheckTemp()
   sensors.requestTemperatures();
   t_inn_body = sensors.getTempCByIndex(0);
   t_inn_vyhlop = sensors.getTempCByIndex(1);
-  //  Serial.print("T1= ");
-  //  Serial.println(t_inn);
+  Serial.print("T1= ");
+  Serial.println(t_inn_body);
+  Serial.print("T2= ");
+  Serial.println(t_inn_vyhlop);
   if (t_inn_body > HIGH_TEMP_BODY || t_inn_vyhlop > HIGH_TEMP_VYHLOP)
   {
     if (highTemperatureStatus == NONE)
     {
       highTemperatureStatus = DETECTED;
-      batteryLowCheckPeriod_ms = 0;
+      highTempCheckPeriod_ms = 0;
     }
-    if (highTemperatureStatus == DETECTED && batteryLowCheckPeriod_ms >= BATTERY_LOW_CHECK_PERIOD_S * 1000)
+    if (highTemperatureStatus == DETECTED && highTempCheckPeriod_ms >= TEMPERATURE_HIGH_CHECK_PERIOD_S * 1000)
     {
       highTemperatureStatus = ALARM;
     }
@@ -262,6 +274,8 @@ bool CheckBattery()
   float curAnalogData = 0.0;
   float v_bat = 0.0;
   curAnalogData = curAnalogData + analogRead(BAT_PIN);
+  Serial.print("CheckBattery=");
+  Serial.println(curAnalogData);
   //Serial.println(curAnalogData);
   v_bat = (curAnalogData * VCC) / 1024.0 / (R2 / (R1 + R2));
   if (v_bat < LOW_VALT)
