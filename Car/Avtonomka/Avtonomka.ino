@@ -1,6 +1,7 @@
 //уходить в спящий режим
 //Подача питания на автономку по кнопке по прерыванию на заданное короткое время (3 мин). Не отключать питание если за это время пошли импульсы на насос.
-//Если в режиме подачи питания нажали кнопку долго и еще нет импульсов на насос, то подождать долгое время(20ч)  если за это время импульсы не пошли, выключить автономку. Для дистанционного управления утром или запуска по таймеру
+//Если в режиме подачи питания нажали кнопку долго и еще нет импульсов на насос, то подождать долгое время(WAIT_START_LONG 20ч)  если за это время импульсы не пошли, выключить автономку. Для дистанционного управления утром или запуска по таймеру
+//Если в режиме подачи питания нажали кнопку коротко и еще нет импульсов на насос, то выключить автономку.
 //Отключение питания через заданное время после прекращения импульсов на насос (время для продувки или повтороного включения при случайном выключении)
 //Подача питания на датчик CO при начале работы насоса. Контроль CO через время (30мин) после начала подачи питания на датчик
 //Сигнализация на превышение CO с отключением насоса.
@@ -82,7 +83,7 @@ elapsedMillis alarmBzzPause_ms;
 //elapsedMillis ledOn_ms;
 elapsedMillis signalPause_ms;
 
-SButton button1(BTTN_PIN, 100, 3000, 10000, 1000);
+SButton button1(BTTN_PIN, 50, 1000, 10000, 1000);
 
 OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
@@ -124,7 +125,7 @@ void setup()
 
   _delay_ms(1000);
 
-  //wdt_enable(WDTO_8S);
+  wdt_enable(WDTO_8S);
 }
 
 void ActionBtn(byte typeClick) //'s' or 'l'
@@ -173,7 +174,7 @@ void ActionBtn(byte typeClick) //'s' or 'l'
 void PrepareSleep()
 {
   pinMode(BTTN_PIN, INPUT_PULLUP);
-  attachInterrupt(0, WakeUp, FALLING);
+  attachInterrupt(0, WakeUpByBttn, FALLING);
 
   wdt_disable();
 }
@@ -206,7 +207,7 @@ void DoSleep()
   sleep_cpu();
 }
 
-void WakeUp()
+void WakeUpByBttn()
 {
   // запрещаем режим сна
   sleep_disable();
@@ -216,6 +217,8 @@ void WakeUp()
   cli();
 
   attachInterrupt(1, NasosWorks, RISING);
+  Serial.println("WakeUp button");
+  ActionBtn('s');
 }
 
 bool CheckCO()
@@ -355,9 +358,7 @@ void GoSleep()
   _delay_ms(100);
   Serial.println("ExitSleep");
   _delay_ms(50);
-  //wdt_enable(WDTO_8S);
-
-  wdt_reset();
+  wdt_enable(WDTO_8S);
 }
 
 void ModeControl()
@@ -385,7 +386,7 @@ void ModeControl()
 
   digitalWrite(NASOS_PIN, (mode == WORK));
   digitalWrite(CO_SRC_PIN, (mode == WORK));
-  digitalWrite(AVTONOMKA_PIN, (mode == WORK || mode == STOPPING));
+  digitalWrite(AVTONOMKA_PIN, mode != SLEEP);
   Serial.print("ModeControl_2=");
   Serial.println(mode);
 }
@@ -476,6 +477,8 @@ void loop()
   Serial.print("mode1=");
   Serial.println(mode);
   checkButtons();
+  //  if (mode != SLEEP)
+  //  {
   checkAlarms();
   checkNasosImpulses();
   ModeControl();
@@ -483,7 +486,7 @@ void loop()
   alarmSignal();
   Serial.print("mode2=");
   Serial.println(mode);
-  _delay_ms(50);
-  if (mode == SLEEP)
-    GoSleep();
+  //}
+  wdt_reset();
+  _delay_ms(100);
 }
