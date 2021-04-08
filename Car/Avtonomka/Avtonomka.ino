@@ -47,14 +47,15 @@ const unsigned long CO_CHECK_PERIOD_S           = 100; //если за это CO
 const unsigned long BATTERY_LOW_CHECK_PERIOD_S  = 300; //если за это время баттарея всегда Low, выключить автономку (долго потому что при старте работает свеча и напряжение будет низкое)
 const unsigned long TEMPERATURE_HIGH_CHECK_PERIOD_S = 30; ////если за это T всегда High, подать сигнал, выключить автономку
 const unsigned long CHECK_ALARM_PERIOD_S        = 10;  //период проверки различных alarms (только при работающей автономке)
+const unsigned long CHECK_ALARM_DELAY_MS        = 100;  //задержка проверки различных alarms после импульса насоса, для правильногоснятия U (только при работающей автономке)
 
 const unsigned int LOW_TONE             = 1600; //нижняя частота зумерв
 const unsigned int HIGH_TONE            = 2200; //верхняя частота зумерв
 
 // резисторы делителя напряжения
-const float R1 = 100000;        // 100K
-const float R2 = 6700;          // 6.7K
-const float VCC = 1.08345;      //  внутреннее опорное напряжение, необходимо откалибровать индивидуально  (м.б. 1.0 -- 1.2)
+const float R1 = 45000;        // 45K
+const float R2 = 3300;          // 3.3K
+const float VCC = 1.14883;      //  внутреннее опорное напряжение, необходимо откалибровать индивидуально  (м.б. 1.0 -- 1.2)
 
 enum EnAlarmStatuses { NONE, DETECTED, ALARM};
 enum EnMode { SLEEP, WAIT_START, WAIT_START_LONG, WORK, STOPPING, ALARM_AND_STOPPING};
@@ -82,6 +83,7 @@ elapsedMillis longPeriodOn_ms;
 elapsedMillis alarmBzzPause_ms;
 //elapsedMillis ledOn_ms;
 elapsedMillis signalPause_ms;
+elapsedMillis checkAlarmDelay_ms;
 
 SButton button1(BTTN_PIN, 50, 1000, 10000, 1000);
 
@@ -114,7 +116,7 @@ void setup()
   sensors.getAddress(tempDeviceAddress, 0);
   sensors.setResolution(tempDeviceAddress, 10);
 
-  attachInterrupt(1, NasosWorks, RISING);
+  attachInterrupt(1, NasosImpulse, RISING);
 
   mode = SLEEP;
   lowBatteryStatus = NONE;
@@ -179,7 +181,7 @@ void PrepareSleep()
   wdt_disable();
 }
 
-void NasosWorks()
+void NasosImpulse()
 {
   Serial.println("NasosWorks");
   nasosImpulsePeriod_ms = 0;
@@ -188,6 +190,7 @@ void NasosWorks()
     mode = WORK;
     coRazorgrevPeriod_ms = 0;
   }
+  checkAlarmDelay_ms = 0;
 }
 
 void DoSleep()
@@ -216,33 +219,35 @@ void WakeUpByBttn()
   // запрещаем прерывания
   cli();
 
-  attachInterrupt(1, NasosWorks, RISING);
+  attachInterrupt(1, NasosImpulse, RISING);
   Serial.println("WakeUp button");
   ActionBtn('s');
 }
 
 bool CheckCO()
 {
-  if (coRazorgrevPeriod_ms >= DELAY_CO_CHECK_M * 60 * 1000)
+  //DL if (coRazorgrevPeriod_ms >= DELAY_CO_CHECK_M * 60 * 1000)
+  //DL{
+  float curAnalogData = analogRead(CO_SIGNAL_PIN);
+  Serial.print("CheckCO= ");
+  Serial.println(curAnalogData);
+  if (curAnalogData > MAX_CO)
   {
-    float curAnalogData = analogRead(CO_SIGNAL_PIN);
-    if (curAnalogData > MAX_CO)
+    if (coStatus == NONE)
     {
-      if (coStatus == NONE)
-      {
-        coStatus = DETECTED;
-        coCheckPeriod_ms = 0;
-      }
-      if (coStatus == DETECTED && coCheckPeriod_ms >= CO_CHECK_PERIOD_S * 1000)
-      {
-        coStatus = ALARM;
-      }
+      coStatus = DETECTED;
+      coCheckPeriod_ms = 0;
     }
-    else
+    if (coStatus == DETECTED && coCheckPeriod_ms >= CO_CHECK_PERIOD_S * 1000)
     {
-      coStatus == NONE;
+      coStatus = ALARM;
     }
   }
+  else
+  {
+    coStatus == NONE;
+  }
+  //DL}
   return (coStatus == ALARM);
 }
 
@@ -281,8 +286,8 @@ bool CheckBattery()
   curAnalogData = curAnalogData + analogRead(BAT_PIN);
   Serial.print("CheckBattery=");
   Serial.println(curAnalogData);
-  //Serial.println(curAnalogData);
   v_bat = (curAnalogData * VCC) / 1024.0 / (R2 / (R1 + R2));
+  Serial.println(v_bat);
   if (v_bat < LOW_VALT)
   {
     if (lowBatteryStatus == NONE)
@@ -320,7 +325,8 @@ bool checkNasosImpulses()
 bool checkAlarms()
 {
   boolean alarm = false;
-  if (mode == WORK && checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000)
+  //DL if (mode == WORK && checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000 && checkAlarmDelay_ms >= CHECK_ALARM_DELAY_MS)
+  if (checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000)
   {
     checkAlarmPeriod_ms = 0;
     if (CheckCO() || CheckBattery() || CheckTemp())
@@ -363,8 +369,6 @@ void GoSleep()
 
 void ModeControl()
 {
-  Serial.print("ModeControl_1=");
-  Serial.println(mode);
   if (mode == WAIT_START && waitPeriod_ms > WAIT_PERIOD_M * 60000 || mode == WAIT_START_LONG && waitLongPeriod_ms > WAIT_LONG_PERIOD_M * 60000)
   {
     mode = SLEEP;
@@ -387,8 +391,6 @@ void ModeControl()
   digitalWrite(NASOS_PIN, (mode == WORK));
   digitalWrite(CO_SRC_PIN, (mode == WORK));
   digitalWrite(AVTONOMKA_PIN, mode != SLEEP);
-  Serial.print("ModeControl_2=");
-  Serial.println(mode);
 }
 
 void resetAlarm()
@@ -474,19 +476,16 @@ void alarmSignal()
 
 void loop()
 {
-  Serial.print("mode1=");
-  Serial.println(mode);
+  //  Serial.print("mode1=");
+  //  Serial.println(mode);
   checkButtons();
-  //  if (mode != SLEEP)
-  //  {
   checkAlarms();
   checkNasosImpulses();
   ModeControl();
   modeSignal();
   alarmSignal();
-  Serial.print("mode2=");
-  Serial.println(mode);
-  //}
+  //  Serial.print("mode2=");
+  //  Serial.println(mode);
   wdt_reset();
-  _delay_ms(100);
+  //_delay_ms(100);
 }
