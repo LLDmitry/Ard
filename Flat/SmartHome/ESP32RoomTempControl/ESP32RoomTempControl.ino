@@ -18,15 +18,16 @@
 #include <SPI.h>
 
 #define BTN_P_PIN       3
-#define BTN_M_PIN       4
+#define BTN_M_PIN       2
 #define HEATER_PIN      8
 #define BUZZ_PIN        9
-#define PIR_SENSOR_PIN  2
-#define ONE_WIRE_PIN    5    // DS18b20
+#define PIR_SENSOR_PIN  10
+#define ONE_WIRE_PIN    4    // DS18b20
+#define IR_PIN          5
 
 //RNF
-#define RNF_CE_PIN      6
-#define RNF_CSN_PIN     7
+#define RNF_CE_PIN      6  //9
+#define RNF_CSN_PIN     7  //8
 #define RNF_MOSI        11
 #define RNF_MISO        12
 #define RNF_SCK         13
@@ -45,6 +46,7 @@ const unsigned long CHECK_ALARM_SENSOR_PERIOD_S = 10;
 const unsigned long SHOW_TMP_INN_S = 10;
 const unsigned long SHOW_TMP_OUT_S = 3;
 const unsigned long SET_ROOM_MODE_S = 10;
+const unsigned long SEND_RF_ON_NAGREV_PERIOD_S = 1;
 
 const int EEPROM_ADR_SET_TEMP = 1023; //last address in eeprom for store tSet
 const float T_SET_MIN = 1.0f;  //0.0f - off
@@ -71,6 +73,7 @@ elapsedMillis displayMode_ms = 0;
 elapsedMillis setRoomMode_ms = 0;
 elapsedMillis buzzOff_ms = 0;
 elapsedMillis buzzOn_ms = 0;
+elapsedMillis sendRfOnNagrev_ms = 0;
 
 bool alarmSensor = false;
 float t_inn = 0.0f;
@@ -384,8 +387,16 @@ void SaveToEEPROM(char command)
 void HeaterControl()
 {
   Serial.println("HeaterControl");
+  if (!heaterStatus)
+  {
+   sendRfOnNagrev_ms = (SEND_RF_ON_NAGREV_PERIOD_S + 1) * 1000; //когда heaterStatus станет true, сразу отправим RF
+  }
   heaterStatus = (t_set_on && set_temp[t_set - 1] > t_inn);
   digitalWrite(HEATER_PIN, heaterStatus);
+  if (heaterStatus)
+  {
+    SendRfCommandOnNagrev();
+  }
   //DisplayData(DISPLAY_INN_TMP);
 }
 
@@ -701,6 +712,16 @@ byte CalculateIntSymbolsLength(byte tInt, char tSign)
       rslt = rslt + 6;
   }
   return rslt;
+}
+
+void SendRfCommandOnNagrev()
+{
+  //send every random period 1-2s
+  if (sendRfOnNagrev_ms > SEND_RF_ON_NAGREV_PERIOD_S * 1000 + random(0, 1000))
+  {
+    sendRfOnNagrev_ms = 0;
+    // send HEATER_PIN
+  }
 }
 
 void loop()

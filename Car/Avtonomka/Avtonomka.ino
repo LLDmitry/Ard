@@ -4,9 +4,9 @@
 //Если в режиме подачи питания нажали кнопку коротко и еще нет импульсов на насос, то выключить автономку.
 //Отключение питания через заданное время после прекращения импульсов на насос (время для продувки или повтороного включения при случайном выключении)
 //Подача питания на датчик CO при начале работы насоса. Контроль CO через время (30мин) после начала подачи питания на датчик
-//Сигнализация на превышение CO с отключением насоса.
-//Сигнализация на падение напяжения с отключением насоса.
-//Контроль температуры на корпусе с отключением насоса при перегреве.
+//Сигнализация на превышение CO с отключением насоса. Выключение невозможно
+//Сигнализация на падение напяжения с отключением насоса. Выключение невозможно
+//Контроль температуры на корпусе с отключением насоса при перегреве. Выключение невозможно
 
 #include "sav_button.h"
 #include <elapsedMillis.h>
@@ -35,22 +35,22 @@ const unsigned long DELAY_CO_CHECK_M    = 20;     //задержка для ра
 const float LOW_VALT                    = 11.5;
 const float HIGH_TEMP_BODY              = 60.0;   //max допустимая температура корпуса автономки
 const float HIGH_TEMP_VYHLOP            = 90.0;   //max допустимая температура в районе выхлопа
-const unsigned long MAX_CO              = 350;
-const unsigned long WAIT_PERIOD_M       = 2; //3;    //период ожидания включения, при этом подается питание автономки
+const unsigned long MAX_CO              = 900;
+const unsigned long WAIT_PERIOD_M       = 2; //3;    //период ожидания включения (начала работы насоса), при этом подается питание автономки
 const unsigned long WAIT_LONG_PERIOD_M  = 3; //1200;    //долгий период ожидания включения, при этом подается питание автономки
 const unsigned long ALARM_PERIOD_S      = 60;     //время подачи сигнала тревоги
 const unsigned long ALARM_PAUSE_S       = 10;      //пауза между повтором bzz сигнала тревоги
 const unsigned long SIGNAL_PAUSE_S      = 10;      //пауза между повтором led сигнала режима работы
 const unsigned long OFF_DELAY_PERIOD_S  = 120;    //время через которое отключится питание автономки после пропадания импульсов насоса
 const unsigned long NASOS_IMPULSE_PERIOD_S      = 10;     //максимально возможный период импульсов насоса (для контроля включенной автономки)
-const unsigned long CO_CHECK_PERIOD_S           = 100; //если за это CO всегда High, подать сигнал, выключить автономку
+const unsigned long CO_CHECK_PERIOD_S           = 100; //если за это время CO всегда High, подать сигнал, выключить автономку
 const unsigned long BATTERY_LOW_CHECK_PERIOD_S  = 300; //если за это время баттарея всегда Low, выключить автономку (долго потому что при старте работает свеча и напряжение будет низкое)
 const unsigned long TEMPERATURE_HIGH_CHECK_PERIOD_S = 30; ////если за это T всегда High, подать сигнал, выключить автономку
 const unsigned long CHECK_ALARM_PERIOD_S        = 10;  //период проверки различных alarms (только при работающей автономке)
-const unsigned long CHECK_ALARM_DELAY_MS        = 100;  //задержка проверки различных alarms после импульса насоса, для правильногоснятия U (только при работающей автономке)
+const unsigned long CHECK_ALARM_DELAY_MS        = 200;  //задержка проверки различных alarms после импульса насоса, для правильногоснятия U (только при работающей автономке)
 
-const unsigned int LOW_TONE             = 1600; //нижняя частота зумерв
-const unsigned int HIGH_TONE            = 2200; //верхняя частота зумерв
+const unsigned int LOW_TONE             = 1600; //нижняя частота зумера Гц
+const unsigned int HIGH_TONE            = 2200; //верхняя частота зумера Гц
 
 // резисторы делителя напряжения
 const float R1 = 45000;        // 45K
@@ -81,7 +81,6 @@ elapsedMillis coRazorgrevPeriod_ms;
 elapsedMillis checkAlarmPeriod_ms;
 elapsedMillis longPeriodOn_ms;
 elapsedMillis alarmBzzPause_ms;
-//elapsedMillis ledOn_ms;
 elapsedMillis signalPause_ms;
 elapsedMillis checkAlarmDelay_ms;
 
@@ -104,6 +103,7 @@ void setup()
 
   pinMode(BTTN_PIN, INPUT_PULLUP);
   pinMode(NASOS_SIGNAL_PIN, INPUT);
+  digitalWrite(CO_SRC_PIN, HIGH); //для закрытия pnp
 
 
   analogReference(INTERNAL);  // DEFAULT: стандартное опорное напряжение 5 В (на платформах с напряжением питания 5 В) или 3.3 В (на платформах с напряжением питания 3.3 В)
@@ -145,8 +145,9 @@ void ActionBtn(byte typeClick) //'s' or 'l'
     }
     else if (mode == SLEEP)
     {
-      mode = WAIT_START;
+      resetAlarm();
       waitPeriod_ms = 0;
+      mode = WAIT_START;
     }
     else if (mode == ALARM_AND_STOPPING)
     {
@@ -163,8 +164,9 @@ void ActionBtn(byte typeClick) //'s' or 'l'
   else if (typeClick == 'l')
   {
     playDigitSignal(1, 0, 'a');
-    if (mode == WAIT_START)
+    if (mode == SLEEP || mode == WAIT_START)
     {
+      resetAlarm();
       waitLongPeriod_ms = 0;
       mode = WAIT_START_LONG;
     }
@@ -183,7 +185,7 @@ void PrepareSleep()
 
 void NasosImpulse()
 {
-  Serial.println("NasosWorks");
+  Serial.println("NasosImpulse");
   nasosImpulsePeriod_ms = 0;
   if (mode == WAIT_START || mode == WAIT_START_LONG)
   {
@@ -326,7 +328,7 @@ bool checkAlarms()
 {
   boolean alarm = false;
   //DL if (mode == WORK && checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000 && checkAlarmDelay_ms >= CHECK_ALARM_DELAY_MS)
-  if (checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000)
+  if ((mode == WORK || mode == WAIT_START || mode == WAIT_START_LONG) && checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000) //DL
   {
     checkAlarmPeriod_ms = 0;
     if (CheckCO() || CheckBattery() || CheckTemp())
@@ -389,7 +391,7 @@ void ModeControl()
   }
 
   digitalWrite(NASOS_PIN, (mode == WORK));
-  digitalWrite(CO_SRC_PIN, (mode == WORK));
+  digitalWrite(CO_SRC_PIN, (mode != WORK && mode != WAIT_START && mode != WAIT_START_LONG)); //dl
   digitalWrite(AVTONOMKA_PIN, mode != SLEEP);
 }
 
@@ -418,7 +420,7 @@ void playDigitSignal(byte numberLowToneSignals, byte numberHighToneSignals, char
     wdt_reset();
   }
   if (numberLowToneSignals > 0 && numberHighToneSignals >  0)
-    _delay_ms(500);
+    _delay_ms(200);
 
   //short
   for (int i = 1; i <= numberHighToneSignals; i++)
@@ -432,7 +434,7 @@ void playDigitSignal(byte numberLowToneSignals, byte numberHighToneSignals, char
       digitalWrite(LED_PIN, LOW);
     if (typeSignal == 'b' || typeSignal == 'a')
       stopBuzzer();
-    _delay_ms(300);
+    _delay_ms(200);
     wdt_reset();
   }
 }
