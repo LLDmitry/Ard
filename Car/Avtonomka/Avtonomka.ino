@@ -31,11 +31,11 @@
 #define LED_PIN             4   //LED индикации состояния
 
 
-const unsigned long DELAY_CO_CHECK_M    = 20;     //задержка для разогрева и стабилизации датчика CO с момента 1го импульса насоса до начала приема его показаний
+const unsigned long DELAY_CO_CHECK_S    = 180;     //задержка для разогрева и стабилизации датчика CO с момента 1го импульса насоса до начала приема его показаний
 const float LOW_VALT                    = 11.5;
 const float HIGH_TEMP_BODY              = 60.0;   //max допустимая температура корпуса автономки
 const float HIGH_TEMP_VYHLOP            = 90.0;   //max допустимая температура в районе выхлопа
-const unsigned long MAX_CO              = 900;
+const unsigned long MAX_CO              = 300;
 const unsigned long WAIT_PERIOD_M       = 2; //3;    //период ожидания включения (начала работы насоса), при этом подается питание автономки
 const unsigned long WAIT_LONG_PERIOD_M  = 3; //1200;    //долгий период ожидания включения, при этом подается питание автономки
 const unsigned long ALARM_PERIOD_S      = 60;     //время подачи сигнала тревоги
@@ -43,11 +43,15 @@ const unsigned long ALARM_PAUSE_S       = 10;      //пауза между по�
 const unsigned long SIGNAL_PAUSE_S      = 10;      //пауза между повтором led сигнала режима работы
 const unsigned long OFF_DELAY_PERIOD_S  = 120;    //время через которое отключится питание автономки после пропадания импульсов насоса
 const unsigned long NASOS_IMPULSE_PERIOD_S      = 10;     //максимально возможный период импульсов насоса (для контроля включенной автономки)
-const unsigned long CO_CHECK_PERIOD_S           = 100; //если за это время CO всегда High, подать сигнал, выключить автономку
+const unsigned long CO_CHECK_PERIOD_S           = 30; //если за это время CO всегда High, подать сигнал, выключить автономку
+const unsigned long CO_PAUSE_RAZOGREV_S           = 300; //время между периодами проверки CO. Питание датчика отключаем
+const unsigned long CO_READY_TO_CHECK_S           = 60; //время после разогрева датчика CO когда можно снимать показания
+const unsigned long CO_RAZOGREV_INIT_S           = 120; //время разогрева датчика CO первый раз
+const unsigned long CO_RAZOGREV_S           = 60; //время разогрева датчика CO последующие разы
 const unsigned long BATTERY_LOW_CHECK_PERIOD_S  = 300; //если за это время баттарея всегда Low, выключить автономку (долго потому что при старте работает свеча и напряжение будет низкое)
 const unsigned long TEMPERATURE_HIGH_CHECK_PERIOD_S = 30; ////если за это T всегда High, подать сигнал, выключить автономку
 const unsigned long CHECK_ALARM_PERIOD_S        = 10;  //период проверки различных alarms (только при работающей автономке)
-const unsigned long CHECK_ALARM_DELAY_MS        = 200;  //задержка проверки различных alarms после импульса насоса, для правильногоснятия U (только при работающей автономке)
+const unsigned long CHECK_ALARM_DELAY_MS        = 200;  //задержка проверки различных alarms после импульса насоса, для правильного снятия U (только при работающей автономке)
 
 const unsigned int LOW_TONE             = 1600; //нижняя частота зумера Гц
 const unsigned int HIGH_TONE            = 2200; //верхняя частота зумера Гц
@@ -61,6 +65,9 @@ enum EnAlarmStatuses { NONE, DETECTED, ALARM};
 enum EnMode { SLEEP, WAIT_START, WAIT_START_LONG, WORK, STOPPING, ALARM_AND_STOPPING};
 
 boolean isProcessBtnCode;
+boolean isCoReadyToCheck;
+boolean isRazogrevCO;
+boolean isFirstRasogrevCO;
 EnAlarmStatuses lowBatteryStatus = NONE;
 EnAlarmStatuses coStatus = NONE;
 EnAlarmStatuses highTemperatureStatus = NONE;
@@ -76,6 +83,8 @@ elapsedMillis offDelayPeriod_ms;
 elapsedMillis nasosImpulsePeriod_ms;
 elapsedMillis batteryLowCheckPeriod_ms;
 elapsedMillis coCheckPeriod_ms;
+elapsedMillis coRazogrevPeriod_ms;
+elapsedMillis coPauseRazogrevPeriod_ms;
 elapsedMillis highTempCheckPeriod_ms;
 elapsedMillis coRazorgrevPeriod_ms;
 elapsedMillis checkAlarmPeriod_ms;
@@ -190,6 +199,7 @@ void NasosImpulse()
   if (mode == WAIT_START || mode == WAIT_START_LONG)
   {
     mode = WORK;
+    isFirstRasogrevCO = true;
     coRazorgrevPeriod_ms = 0;
   }
   checkAlarmDelay_ms = 0;
@@ -226,30 +236,66 @@ void WakeUpByBttn()
   ActionBtn('s');
 }
 
-bool CheckCO()
+void ControlCO()
 {
-  //DL if (coRazorgrevPeriod_ms >= DELAY_CO_CHECK_M * 60 * 1000)
-  //DL{
-  float curAnalogData = analogRead(CO_SIGNAL_PIN);
-  Serial.print("CheckCO= ");
-  Serial.println(curAnalogData);
-  if (curAnalogData > MAX_CO)
+  if (mode == WORK)
   {
-    if (coStatus == NONE)
+    if (isRazogrevCO)
     {
-      coStatus = DETECTED;
-      coCheckPeriod_ms = 0;
+      if (coRazogrevPeriod_ms >= (isFirstRasogrevCO ? CO_RAZOGREV_INIT_S : CO_RAZOGREV_S) * 1000)
+      {
+        isRazogrevCO = false;
+        isFirstRasogrevCO = false;
+        isCoReadyToCheck = true;
+        coPauseRazogrevPeriod_ms = 0;
+      }
+      else
+      {
+        isRazogrevCO = true;
+      }
     }
-    if (coStatus == DETECTED && coCheckPeriod_ms >= CO_CHECK_PERIOD_S * 1000)
+    else
     {
-      coStatus = ALARM;
+      if (coPauseRazogrevPeriod_ms >= CO_PAUSE_RAZOGREV_S * 1000)
+      {
+        isRazogrevCO = true;
+        coRazogrevPeriod_ms = 0;
+      }
     }
   }
   else
   {
-    coStatus == NONE;
+    isRazogrevCO = false;
   }
-  //DL}
+  digitalWrite(CO_SRC_PIN, isRazogrevCO);
+}
+
+bool CheckCO()
+{
+  ControlCO();
+  if (mode == WORK && !isRazogrevCO && coPauseRazogrevPeriod_ms < CO_READY_TO_CHECK_S * 1000)
+  {
+    isCoReadyToCheck = true;
+    float curAnalogData = analogRead(CO_SIGNAL_PIN);
+    Serial.print("CheckCO= ");
+    Serial.println(curAnalogData);
+    if (curAnalogData > MAX_CO)
+    {
+      if (coStatus == NONE)
+      {
+        coStatus = DETECTED;
+        coCheckPeriod_ms = 0;
+      }
+      if (coStatus == DETECTED && coCheckPeriod_ms >= CO_CHECK_PERIOD_S * 1000)
+      {
+        coStatus = ALARM;
+      }
+    }
+    else
+    {
+      coStatus == NONE;
+    }
+  }
   return (coStatus == ALARM);
 }
 
