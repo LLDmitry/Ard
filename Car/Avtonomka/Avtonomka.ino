@@ -30,28 +30,27 @@
 #define AVTONOMKA_PIN       6   //на реле включения питания автономки
 #define LED_PIN             4   //LED индикации состояния
 
-const float LOW_VALT                    = 11.5;
-const float HIGH_TEMP_BODY              = 60.0;   //max допустимая температура корпуса автономки
-const float HIGH_TEMP_VYHLOP            = 90.0;   //max допустимая температура в районе выхлопа
-const unsigned long MAX_CO              = 300;
-const unsigned long WAIT_PERIOD_M       = 2;      //короткий период ожидания включения (начала работы насоса), при этом подается питание автономки
-const unsigned long WAIT_LONG_PERIOD_M  = 1200;   //долгий период ожидания включения, при этом подается питание автономки
-const unsigned long ALARM_PERIOD_S      = 60;     //время подачи сигнала тревоги
-const unsigned long ALARM_PAUSE_S       = 10;     //пауза между повтором bzz сигнала тревоги
-const unsigned long SIGNAL_PAUSE_S      = 10;     //пауза между повтором led сигнала режима работы
-const unsigned long OFF_DELAY_PERIOD_S  = 120;    //время через которое отключится питание автономки после пропадания импульсов насоса
-const unsigned long MIN_NASOS_IMPULSE_PERIOD_MS   = 100; //игнорируем импульсы если между ними меньше этого времени
-const unsigned long CHECK_NASOS_IMPULSE_PERIOD_S  = 5;  //период контроля импульсов насоса, подсчета импульсов внутри периода(для контроля включенной автономки)
-const unsigned long CO_CHECK_PERIOD_S             = 30; //если за это время CO всегда High, подать сигнал, выключить автономку
-const unsigned long CO_RAZOGREV_INIT_S            = 300; //время разогрева датчика после которого можно снимать показания
-const unsigned long BATTERY_LOW_CHECK_PERIOD_S    = 300; //если за это время баттарея всегда Low, выключить автономку (долго потому что при старте работает свеча и напряжение будет низкое)
-const unsigned long TEMPERATURE_HIGH_CHECK_PERIOD_S = 30; ////если за это T всегда High, подать сигнал, выключить автономку
-const unsigned long CHECK_ALARM_PERIOD_S          = 10;  //период проверки различных alarms (только при работающей автономке)
-const unsigned long CHECK_ALARM_DELAY_MS          = 200;  //задержка проверки различных alarms после импульса насоса, для правильного снятия U (только при работающей автономке)
-const unsigned long SWITCH_ON_DELAY_MS            = 1000; //задержка всех проверок после подвчи питания на автономку
-const unsigned int LOW_TONE                       = 1600; //нижняя частота зумера Гц
-const unsigned int HIGH_TONE                      = 2200; //верхняя частота зумера Гц
-const int NUMBER_NASOS_IMPULSES_WORK              = 5; //количество импульсов за CHECK_NASOS_IMPULSE_PERIOD_S означающее что автономка работает
+const float LOW_VALT                              = 11.5;
+const float HIGH_TEMP_BODY                        = 60.0;   //max допустимая температура корпуса автономки
+const float HIGH_TEMP_VYHLOP                      = 90.0;   //max допустимая температура в районе выхлопа
+const unsigned long WAIT_PERIOD_M                 = 2;      //короткий период ожидания включения (начала работы насоса), при этом подается питание автономки
+const unsigned long WAIT_LONG_PERIOD_M            = 1200;   //долгий период ожидания включения, при этом подается питание автономки
+const unsigned long ALARM_PERIOD_S                = 60;     //время подачи сигнала тревоги
+const unsigned long ALARM_PAUSE_S                 = 10;     //пауза между повтором bzz сигнала тревоги
+const unsigned long SIGNAL_PAUSE_S                = 10;     //пауза между повтором led сигнала режима работы
+const unsigned long OFF_DELAY_PERIOD_S            = 200;    //время через которое отключится питание автономки после пропадания импульсов насоса
+const unsigned long MIN_NASOS_IMPULSE_PERIOD_MS   = 100;    //игнорируем импульсы если между ними меньше этого времени
+const unsigned long CHECK_NASOS_IMPULSE_PERIOD_S  = 5;      //период контроля импульсов насоса, подсчета импульсов внутри периода(для контроля включенной автономки)
+const unsigned long CO_CHECK_PERIOD_S             = 30;     //если за это время CO всегда High, подать сигнал, выключить автономку
+const unsigned long CO_RAZOGREV_INIT_S            = 300;    //время разогрева датчика после которого можно снимать показания
+const unsigned long BATTERY_LOW_CHECK_PERIOD_S    = 300;    //если за это время баттарея всегда Low, выключить автономку (долго потому что при старте работает свеча и напряжение будет низкое)
+const unsigned long TEMPERATURE_HIGH_CHECK_PERIOD_S = 30;   //если за это T всегда High, подать сигнал, выключить автономку
+const unsigned long CHECK_ALARM_PERIOD_S          = 10;     //период проверки различных alarms (только при работающей автономке)
+const unsigned long CHECK_ALARM_DELAY_MS          = 200;    //задержка проверки различных alarms после импульса насоса, для правильного снятия U (только при работающей автономке)
+const unsigned long SWITCH_ON_DELAY_MS            = 1000;   //задержка всех проверок после подвчи питания на автономку
+const unsigned int LOW_TONE                       = 1600;   //нижняя частота зумера Гц
+const unsigned int HIGH_TONE                      = 2200;   //верхняя частота зумера Гц
+const int NUMBER_NASOS_IMPULSES_WORK              = 5;      //количество импульсов за CHECK_NASOS_IMPULSE_PERIOD_S означающее что автономка работает
 
 // резисторы делителя напряжения
 const float R1 = 45000;        // 45K
@@ -264,7 +263,8 @@ bool CheckCO()
   ControlSourceCO();
   if (mode == WORK && !isRazogrevCO)
   {
-    if (digitalRead(!CO_SIGNAL_PIN)) //reverse
+    int coState = digitalRead(!CO_SIGNAL_PIN);
+    if (coState == LOW) //reverse
     {
       if (coStatus == NONE)
       {
