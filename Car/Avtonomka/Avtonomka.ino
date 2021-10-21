@@ -40,7 +40,7 @@ const unsigned long ALARM_PAUSE_S                 = 10;     //пауза меж�
 const unsigned long SIGNAL_PAUSE_S                = 10;     //пауза между повтором led сигнала режима работы
 const unsigned long OFF_DELAY_PERIOD_S            = 200;    //время через которое отключится питание автономки после пропадания импульсов насоса
 const unsigned long MIN_NASOS_IMPULSE_PERIOD_MS   = 100;    //игнорируем импульсы если между ними меньше этого времени
-const unsigned long CHECK_NASOS_IMPULSE_PERIOD_S  = 5;      //период контроля импульсов насоса, подсчета импульсов внутри периода(для контроля включенной автономки)
+const unsigned long CHECK_NASOS_IMPULSE_PERIOD_S  = 6;     //период контроля импульсов насоса, подсчета импульсов внутри периода(для контроля включенной автономки)
 const unsigned long CO_CHECK_PERIOD_S             = 30;     //если за это время CO всегда High, подать сигнал, выключить автономку
 const unsigned long CO_RAZOGREV_INIT_S            = 300;    //время разогрева датчика после которого можно снимать показания
 const unsigned long BATTERY_LOW_CHECK_PERIOD_S    = 300;    //если за это время баттарея всегда Low, выключить автономку (долго потому что при старте работает свеча и напряжение будет низкое)
@@ -50,7 +50,7 @@ const unsigned long CHECK_ALARM_DELAY_MS          = 200;    //задержка �
 const unsigned long SWITCH_ON_DELAY_MS            = 1000;   //задержка всех проверок после подвчи питания на автономку
 const unsigned int LOW_TONE                       = 1600;   //нижняя частота зумера Гц
 const unsigned int HIGH_TONE                      = 2200;   //верхняя частота зумера Гц
-const int NUMBER_NASOS_IMPULSES_WORK              = 5;      //количество импульсов за CHECK_NASOS_IMPULSE_PERIOD_S означающее что автономка работает
+const int NUMBER_NASOS_IMPULSES_WORK              = 3;      //количество импульсов за CHECK_NASOS_IMPULSE_PERIOD_S означающее что автономка работает
 
 // резисторы делителя напряжения
 const float R1 = 45000;        // 45K
@@ -58,7 +58,7 @@ const float R2 = 3300;          // 3.3K
 const float VCC = 1.222;      //  внутреннее опорное напряжение, необходимо откалибровать индивидуально  (м.б. 1.0 -- 1.2)
 
 enum EnAlarmStatuses { NONE, DETECTED, ALARM};
-enum EnMode { SLEEP, WAIT_START, WAIT_START_LONG, WORK, STOPPING, ALARM_AND_STOPPING};
+enum EnMode { SLEEP, WAIT_START, WAIT_START_LONG, WORK, STOPPING, ALARM_AND_STOPPING, WORK_NO_CHECK_ALARM};
 
 boolean isProcessBtnCode;
 boolean isCoReadyToCheck;
@@ -163,7 +163,7 @@ void ActionBtn(byte typeClick) //'s' or 'l'
       mode = STOPPING;
       offDelayPeriod_ms = 0;
     }
-    else if (mode == WORK)
+    else if (mode == WORK || mode == WORK_NO_CHECK_ALARM)
     {
       Serial.println("STOPPING_2");
       mode = STOPPING;
@@ -173,18 +173,22 @@ void ActionBtn(byte typeClick) //'s' or 'l'
   else if (typeClick == 'l')
   {
     playDigitSignal(1, 0, 'a');
-    if (mode == SLEEP || mode == WAIT_START)
+    if (mode == SLEEP)
     {
       resetAlarm();
       waitLongPeriod_ms = 0;
       checkNasosImpulsePeriod_ms = 0;
       mode = WAIT_START_LONG;
     }
-    else if (mode == WORK)
+    else if (mode == WORK || mode == WORK_NO_CHECK_ALARM)
     {
       Serial.println("STOPPING_22");
       mode = STOPPING;
       offDelayPeriod_ms = 0;
+    }
+    else if (mode == WAIT_START || mode == WAIT_START_LONG || mode == STOPPING)
+    {
+      mode = WORK_NO_CHECK_ALARM;
     }
   }
   Serial.print("mode4=");
@@ -263,11 +267,11 @@ bool CheckCO()
   ControlSourceCO();
   if (mode == WORK && !isRazogrevCO)
   {
-    int coState = digitalRead(!CO_SIGNAL_PIN);
-    if (coState == LOW) //reverse
+    if (digitalRead(CO_SIGNAL_PIN) == LOW) //LOW because reverse from sensor
     {
       if (coStatus == NONE)
       {
+        Serial.print("CO DETECTED");
         coStatus = DETECTED;
         coCheckPeriod_ms = 0;
       }
@@ -374,8 +378,7 @@ void checkNasosImpulses()
 bool checkAlarms()
 {
   boolean alarm = false;
-  //DL if (mode == WORK && checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000 && checkAlarmDelay_ms >= CHECK_ALARM_DELAY_MS)
-  if ((mode == WORK || mode == WAIT_START || mode == WAIT_START_LONG) && checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000) //DL
+  if ((mode == WORK || mode == WAIT_START || mode == WAIT_START_LONG) && checkAlarmPeriod_ms >= CHECK_ALARM_PERIOD_S * 1000)
   {
     checkAlarmPeriod_ms = 0;
     if (CheckCO() || CheckBattery() || CheckTemp())
@@ -438,7 +441,7 @@ void ModeControl()
     mode = SLEEP;
   }
 
-  digitalWrite(NASOS_PIN, (mode == WORK));
+  digitalWrite(NASOS_PIN, (mode == WORK || mode == WORK_NO_CHECK_ALARM));
   digitalWrite(CO_SRC_PIN, mode != WORK); // invert
   digitalWrite(AVTONOMKA_PIN, mode != SLEEP);
 }
@@ -508,6 +511,8 @@ void modeSignal()
       playDigitSignal(1, 0, 'l');
     else if (mode == STOPPING)
       playDigitSignal(3, 0, 'l');
+    else if (mode == WORK_NO_CHECK_ALARM)
+      playDigitSignal(8, 0, 'l');
   }
 }
 
