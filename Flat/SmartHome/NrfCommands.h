@@ -16,7 +16,9 @@ const uint8_t ArRoomsChannelsNRF[] = {50, 51, 52, 53, 54, 55, 56, 57};
 enum enRequestCommand { RQ_NO, RQ_T_INFO, RQ_CLOSE_VODA_1, RQ_CLOSE_VODA_2, RQ_ALARM_SHORT, RQ_ALARM_LONG, RQ_VENT };
 enum enResponseCommand { RSP_NO, RSP_INFO, RSP_COMMAND };
 enum enAlarmType { ALR_NO, ALR_VODA, ALR_DOOR };
-enum enRooms { ROOM_GOST, ROOM_BED, ROOM_VANNA1, ROOM_VANNA2, ROOM_HALL, ROOM_VENT, ROOM_SENSOR};
+enum enRooms { ROOM_GOST, ROOM_BED, ROOM_VANNA1, ROOM_VANNA2, ROOM_HALL, ROOM_VENT, ROOM_SENSOR, ROOM_DET};
+
+enum EnServoPosition { SERVO_0, SERVO_1, SERVO_2, SERVO_3 }; //SERVO_0 - полностью закрыт, SERVO_3 - полностью открыт
 
 typedef struct {
   enRequestCommand Command;  //1b
@@ -29,6 +31,9 @@ typedef struct {
   byte minutes;         //1b
   byte alarmMaxStatus;  //1b
   byte alarmRooms;  	//1b
+  byte servoDet;       //1b
+  byte servoBed;       //1b
+  byte servoGost;       //1b
 } NRFRequest;         	//11b
 
 typedef struct {

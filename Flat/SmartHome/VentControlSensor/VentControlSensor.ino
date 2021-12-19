@@ -24,6 +24,7 @@
 #include <avr/wdt.h>
 #include <util/delay.h>
 #include <Adafruit_BMP085.h> //давление Vcc – +5в; SDA – (A4);SCL - (A5)
+#include <Servo.h>
 
 
 //RNF  SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
@@ -38,7 +39,11 @@
 
 #define VENT_SPEED1_PIN 7
 #define VENT_SPEED2_PIN 8
-#define VENT_SPEED3_PIN 16 //A3
+//#define VENT_SPEED3_PIN 16 //A3
+
+#define SERVO_DET_PIN 4
+#define SERVO_BED_PIN 4
+#define SERVO_GOST_PIN 4
 
 #define P1_PIN 5  //до фильтра
 #define P2_PIN 4  //после фильтра
@@ -47,6 +52,11 @@ const byte ROOM_NUMBER = ROOM_VENT;
 
 const uint32_t REFRESH_SENSOR_INTERVAL_S = 60;
 const uint32_t READ_COMMAND_NRF_INTERVAL_S = 1;
+
+const byte SERVO_0_DGR = 90;
+const byte SERVO_1_DGR = 80;
+const byte SERVO_2_DGR = 60;
+const byte SERVO_3_DGR = 0;
 
 
 elapsedMillis refreshSensors_ms = REFRESH_SENSOR_INTERVAL_S * 1000 + 1;
@@ -69,6 +79,14 @@ OneWire ds(ONE_WIRE_PIN);
 DallasTemperature sensors(&ds);
 
 DeviceAddress tempDeviceAddress;
+
+Servo servoDet;  // create servo object to control a servo
+Servo servoBed;  // create servo object to control a servo
+Servo servoGost;  // create servo object to control a servo
+
+EnServoPosition servoPositionDet = SERVO_1;
+EnServoPosition servoPositionBed = SERVO_3;
+EnServoPosition servoPositionGost = SERVO_1;
 
 
 void setup()
@@ -101,10 +119,14 @@ void setup()
 
   pinMode(VENT_SPEED1_PIN, OUTPUT);
   pinMode(VENT_SPEED2_PIN, OUTPUT);
-  pinMode(VENT_SPEED3_PIN, OUTPUT);
+  //pinMode(VENT_SPEED3_PIN, OUTPUT);
 
   pinMode(P1_PIN, OUTPUT);
   pinMode(P2_PIN, OUTPUT);
+
+  servoDet.attach(SERVO_DET_PIN);
+  servoBed.attach(SERVO_BED_PIN);
+  servoGost.attach(SERVO_GOST_PIN);
 
   wdt_enable(WDTO_8S);
 }
@@ -125,7 +147,6 @@ void PrepareCommandNRF()
 
 void RefreshSensorData()
 {
-
   if (refreshSensors_ms > REFRESH_SENSOR_INTERVAL_S * 1000)
   {
     Serial.println("RefreshSensorData");
@@ -133,8 +154,8 @@ void RefreshSensorData()
     sensors.requestTemperatures();
     t_out = sensors.getTempCByIndex(0);
 
-//    if (t_out == -127)
-//      t_out = 22.33;
+    //    if (t_out == -127)
+    //      t_out = 22.33;
     Serial.print("t_out=");
     Serial.println(t_out);
 
@@ -160,6 +181,7 @@ void HandleInputNrfCommand()
 {
   Serial.print("roomNumber= ");
   Serial.println(nrfRequest.roomNumber);
+  ControlServo();
   VentControl();
 }
 
@@ -168,9 +190,9 @@ void VentControl()
   Serial.print("ventSpeed= ");
   Serial.println(nrfRequest.ventSpeed);
 
-  digitalWrite(VENT_SPEED1_PIN, nrfRequest.ventSpeed == 1);
-  digitalWrite(VENT_SPEED2_PIN, nrfRequest.ventSpeed == 2);
-  digitalWrite(VENT_SPEED3_PIN, nrfRequest.ventSpeed == 3);
+  digitalWrite(VENT_SPEED1_PIN, nrfRequest.ventSpeed == 1 || nrfRequest.ventSpeed == 3);
+  digitalWrite(VENT_SPEED2_PIN, nrfRequest.ventSpeed == 2 || nrfRequest.ventSpeed == 3);
+  //digitalWrite(VENT_SPEED3_PIN, nrfRequest.ventSpeed == 3);
 }
 
 
@@ -207,6 +229,38 @@ void ReadCommandNRF()
       }
     }
     readCommandNRF_ms = 0;
+  }
+}
+
+void ControlServo()
+{
+  Serial.print("servoDet= ");
+  Serial.println(nrfRequest.servoDet);
+  Serial.print("servoDet= ");
+  Serial.println(servoBed.servoBed);
+  Serial.print("servoGost= ");
+  Serial.println(nrfRequest.servoGost);
+
+  servoDet.write(GetServoAngle(nrfRequest.servoDet));
+  servoBed.write(GetServoAngle(nrfRequest.servoBed));
+  servoGost.write(GetServoAngle(nrfRequest.servoGost));
+}
+
+byte GetServoAngle(EnServoPosition servoPosition)
+{
+  switch (servoPosition) {
+    case SERVO_0:
+      return SERVO_0_DGR;
+      break;
+    case SERVO_1:
+      return SERVO_1_DGR;
+      break;
+    case SERVO_2:
+      return SERVO_2_DGR;
+      break;
+    case SERVO_3:
+      return SERVO_3_DGR;
+      break;
   }
 }
 
