@@ -70,6 +70,9 @@ int p2_v = 0;    //давление после фильтра
 NRFResponse nrfResponse;
 NRFRequest nrfRequest;
 
+byte servoBedPrev = 0;
+byte servoDetPrev = 0;
+byte servoGostPrev = 0;
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10  9,10 для Уно или 9, 53 для Меги
 RF24 radio(RNF_CE_PIN, RNF_CSN_PIN);
@@ -123,10 +126,6 @@ void setup()
 
   pinMode(P1_PIN, OUTPUT);
   pinMode(P2_PIN, OUTPUT);
-
-  servoDet.attach(SERVO_DET_PIN);
-  servoBed.attach(SERVO_BED_PIN);
-  servoGost.attach(SERVO_GOST_PIN);
 
   wdt_enable(WDTO_8S);
 }
@@ -241,9 +240,32 @@ void ControlServo()
   Serial.print("servoGost= ");
   Serial.println(nrfRequest.servoGost);
 
-  servoDet.write(GetServoAngle(nrfRequest.servoDet));
-  servoBed.write(GetServoAngle(nrfRequest.servoBed));
-  servoGost.write(GetServoAngle(nrfRequest.servoGost));
+  if (nrfRequest.servoDet != servoDetPrev)
+  {
+    servoDet.attach(SERVO_DET_PIN);
+    servoDet.write(GetServoAngle(nrfRequest.servoDet));
+    delay(1000);
+    servoDet.detach();
+    servoDetPrev = nrfRequest.servoDet;
+  }
+
+  if (nrfRequest.servoBed != servoBedPrev)
+  {
+    servoBed.attach(SERVO_BED_PIN);
+    servoBed.write(GetServoAngle(nrfRequest.servoBed));
+    delay(1000);
+    servoBed.detach();
+    servoBedPrev = nrfRequest.servoBed;
+  }
+
+  if (nrfRequest.servoGost != servoGostPrev)
+  {
+    servoGost.attach(SERVO_GOST_PIN);
+    servoGost.write(GetServoAngle(nrfRequest.servoGost));
+    delay(1000);
+    servoGost.detach();
+    servoGostPrev = nrfRequest.servoGost;
+  }
 }
 
 byte GetServoAngle(EnServoPosition servoPosition)
